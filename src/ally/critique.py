@@ -11,8 +11,10 @@ from ally.contracts import (
     CritiqueIssue,
     CritiqueReport,
 )
+from ally.cross_claim import check_cross_claims
 from ally.enums import ChecklistAnswer, CritiqueCode, EpistemicStatus, Genre
-from ally.knowledge import firewall_hits, genre_lede_ok, query_canon
+from ally.firewall import hits as firewall_hits
+from ally.knowledge import genre_lede_ok, query_canon
 
 _EFFICACY_HINT = re.compile(
     r"\b(weight loss|efficac|reduction|responder|hba1c|a1c|placebo-adjusted|mean change)\b",
@@ -30,15 +32,6 @@ _INTENSIFIERS = (
     "highest",
     "lowest",
 )
-_GI_MILD = re.compile(
-    r"gi (adverse events|aes?).{0,120}(comparable|mild|manageable|similar to placebo|not treatment[- ]limiting)"
-    r"|(comparable|mild|manageable|similar to placebo|not treatment[- ]limiting).{0,120}gi (adverse events|aes?)",
-    re.IGNORECASE,
-)
-_GI_DISCONTINUATION = re.compile(
-    r"(discontinu(?:ation|ed).{0,80}gi|gi.{0,80}discontinu)",
-    re.IGNORECASE,
-)
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
@@ -46,7 +39,7 @@ def run_self_critique(diagnosis: AllyStrategicDiagnosis) -> CritiqueReport:
     """Highest-leverage gate. Runs before Human Strategic Lock, not instead of it."""
     issues: list[CritiqueIssue] = []
     issues.extend(_admissibility(diagnosis))
-    issues.extend(_cross_claim(diagnosis.claims))
+    issues.extend(check_cross_claims(diagnosis.claims))
     issues.extend(_estimand(diagnosis.claims))
     issues.extend(_intensifier(diagnosis.claims, diagnosis.spine_candidates))
     issues.extend(_genre(diagnosis.spine_candidates))
@@ -130,26 +123,6 @@ def _spine_admissibility(
             )
         )
     return issues
-
-
-def _cross_claim(claims: list[Claim]) -> list[CritiqueIssue]:
-    mild = [claim for claim in claims if _GI_MILD.search(claim.text)]
-    disc = [claim for claim in claims if _GI_DISCONTINUATION.search(claim.text)]
-    if not (mild and disc):
-        return []
-    return [
-        CritiqueIssue(
-            code=CritiqueCode.CROSS_CLAIM,
-            rule_id="XCLAIM-GI-AE",
-            claim_ids=[claim.id for claim in mild + disc],
-            message=(
-                "GI-AE characterization contradicts GI-related discontinuation. "
-                f"Mild/comparable claims: {[c.id for c in mild]}. "
-                f"Discontinuation claims: {[c.id for c in disc]}. "
-                "Reconciliation must resolve this before lock."
-            ),
-        )
-    ]
 
 
 def _estimand(claims: list[Claim]) -> list[CritiqueIssue]:

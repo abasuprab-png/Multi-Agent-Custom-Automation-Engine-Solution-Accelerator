@@ -62,10 +62,25 @@ def test_delegation_identity_inference_is_quarantined():
         origin_agent="specialist",
         epistemic=EpistemicStatus.INFERRED,
         text="Dr. Invented endorsed the asset.",
-        inferred_identity="Dr. Invented",
     )
     result = ingest_envelope(envelope, brief=brief)
     assert result.reason is QuarantineReason.IDENTITY_INFERENCE
+
+
+def test_delegation_named_lead_in_the_brief_is_allowed():
+    brief = DelegationBrief(
+        task="Summarize",
+        stated_facts=[],
+        allowed_identities=["Jane Lead"],
+    )
+    envelope = InboundEnvelope(
+        source=ClaimSource.AGENT,
+        origin_agent="specialist",
+        epistemic=EpistemicStatus.INFERRED,
+        text="Dr. Jane Lead asked for the treatment-policy figure.",
+    )
+    result = ingest_envelope(envelope, brief=brief)
+    assert isinstance(result, Claim)
 
 
 def test_delegation_extra_facts_are_quarantined():
@@ -80,10 +95,49 @@ def test_delegation_extra_facts_are_quarantined():
         origin_agent="specialist",
         epistemic=EpistemicStatus.INFERRED,
         text="Also, peak sales will be $8bn.",
-        extra_facts=["peak sales will be $8bn"],
     )
     result = ingest_envelope(envelope, brief=brief)
     assert result.reason is QuarantineReason.UNSTATED_FACT
+
+
+def test_delegation_restatement_must_cite_a_stated_fact():
+    fact = Claim(
+        text="FDA approved the product on 2026-03-12.",
+        source=ClaimSource.WEB,
+        epistemic=EpistemicStatus.VERIFIED,
+    )
+    brief = DelegationBrief(task="rewrite", stated_facts=[fact])
+    envelope = InboundEnvelope(
+        source=ClaimSource.AGENT,
+        origin_agent="specialist",
+        epistemic=EpistemicStatus.INFERRED,
+        supports_fact_id=fact.id,
+        text="FDA approved the product on 2026-03-12, as stated.",
+    )
+    result = ingest_envelope(envelope, brief=brief)
+    assert isinstance(result, Claim)
+
+
+def test_delegation_restatement_cannot_smuggle_a_new_identity():
+    fact = Claim(
+        text="FDA approved the product on 2026-03-12.",
+        source=ClaimSource.WEB,
+        epistemic=EpistemicStatus.VERIFIED,
+    )
+    brief = DelegationBrief(
+        task="rewrite",
+        stated_facts=[fact],
+        allowed_identities=["Jane Lead"],
+    )
+    envelope = InboundEnvelope(
+        source=ClaimSource.AGENT,
+        origin_agent="specialist",
+        epistemic=EpistemicStatus.INFERRED,
+        supports_fact_id=fact.id,
+        text="Dr. Invented said FDA approved the product on 2026-03-12.",
+    )
+    result = ingest_envelope(envelope, brief=brief)
+    assert result.reason is QuarantineReason.IDENTITY_INFERENCE
 
 
 def test_patent_vocab_is_blocked_on_ingest():

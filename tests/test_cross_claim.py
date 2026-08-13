@@ -1,6 +1,8 @@
 """Cross-claim consistency. The planted GI-AE / discontinuation contradiction cannot pass."""
 
-from ally.enums import CritiqueCode, EpistemicStatus, QuarantineReason, Stage
+from ally.contracts import Claim
+from ally.cross_claim import check_cross_claims
+from ally.enums import ClaimSource, CritiqueCode, EpistemicStatus, QuarantineReason, Stage
 from ally.fixtures import gi_ae_contradiction_input, happy_path_input
 from ally.runtime import run_vertical_slice
 
@@ -35,3 +37,22 @@ def test_happy_path_has_no_cross_claim_failure():
     assert all(
         issue.code is not CritiqueCode.CROSS_CLAIM for issue in session.critique.issues
     )
+
+
+def test_qualitative_gi_vs_rate_difference_is_enough():
+    issues = check_cross_claims(
+        [
+            Claim(
+                text="GI adverse events were comparable to placebo.",
+                source=ClaimSource.AGENT,
+                epistemic=EpistemicStatus.INFERRED,
+            ),
+            Claim(
+                text="GI adverse events occurred in 80% versus 40% with placebo.",
+                source=ClaimSource.WEB,
+                epistemic=EpistemicStatus.VERIFIED,
+            ),
+        ]
+    )
+    assert issues
+    assert issues[0].rule_id == "XCLAIM-GI-AE"

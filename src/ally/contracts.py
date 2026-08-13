@@ -79,8 +79,7 @@ class InboundEnvelope(BaseModel):
     epistemic: EpistemicStatus | None = None
     estimand: EstimandBasis | None = None
     numeric_anchors: list[str] = Field(default_factory=list)
-    inferred_identity: str | None = None
-    extra_facts: list[str] = Field(default_factory=list)
+    supports_fact_id: str | None = None
 
 
 class QuarantineRecord(BaseModel):
@@ -104,6 +103,18 @@ class QuarantineRecord(BaseModel):
             source=envelope.source,
             origin_agent=envelope.origin_agent,
             text=envelope.text,
+            detail=detail,
+        )
+
+    @classmethod
+    def hold_claim(
+        cls, claim: Claim, reason: QuarantineReason, detail: str
+    ) -> QuarantineRecord:
+        return cls(
+            reason=reason,
+            source=claim.source,
+            origin_agent=claim.origin_agent,
+            text=claim.text,
             detail=detail,
         )
 
@@ -252,6 +263,7 @@ class HumanInput(BaseModel):
     envelopes: list[InboundEnvelope] = Field(default_factory=list)
     open_verification: list[OpenVerificationItem] = Field(default_factory=list)
     spine: AllyMessageSpineCandidate | None = None
+    nct_id: str | None = None
 
     @field_validator("client_id", "brand_id", "lead_id", "task")
     @classmethod

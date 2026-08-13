@@ -79,6 +79,7 @@ class QuarantineReason(str, Enum):
     IDENTITY_INFERENCE = "identity_inference"
     UNSTATED_FACT = "unstated_fact"
     CROSS_CLAIM = "cross_claim"
+    SECONDARY_SUPERSEDED = "secondary_superseded"
 
 
 class EstimandBasis(str, Enum):

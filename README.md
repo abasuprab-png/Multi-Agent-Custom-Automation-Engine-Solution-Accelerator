@@ -19,7 +19,7 @@ Typed multi-agent runtime for strategic counsel. Magentic-style prompt routing i
 
 Ally is two internal passes, not two agents: Discovery+Counsel (temp 0.3–0.4) and Evidence Reconciliation (temp 0–0.1, same frontier tier).
 
-This slice does **not** call a live model, ClinicalTrials.gov, CAMS, or Lexie/RCC. It enforces the object model those tools will sit on. The GI-AE fixture is the eval: a planted contradictory draft must be caught, held, and handed to a human as a structured interrupt.
+This slice does **not** call a live model, CAMS, or Lexie/RCC. Structured retrieval is a port (`StructuredRetriever`); the ClinicalTrials.gov fixture is what resolves REDEFINE-style estimand confusion. Identity inference is read from prose. Cross-claim rules live in a registry. The GI-AE fixture remains the eval for unsigned execution.
 
 ## Run
 

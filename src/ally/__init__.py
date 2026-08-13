@@ -26,6 +26,7 @@ from ally.enums import (
 from ally.exceptions import LockGateError, RefusalError, SequenceLockError
 from ally.memory import MemoryStore
 from ally.prompts import SYSTEM_PROMPT
+from ally.retrieval import ClinicalTrialsFixture, RetrievalQuery
 from ally.runtime import AllySession, assert_transition, run_vertical_slice
 
 __all__ = [
@@ -51,6 +52,8 @@ __all__ = [
     "LockGateError",
     "MemoryStore",
     "RefusalError",
+    "ClinicalTrialsFixture",
+    "RetrievalQuery",
     "SYSTEM_PROMPT",
     "SequenceLockError",
     "Stage",

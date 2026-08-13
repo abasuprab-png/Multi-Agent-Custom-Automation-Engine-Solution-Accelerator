@@ -29,6 +29,7 @@ from ally.ingest import ingest_envelopes, inferred_texts, unresolved_texts
 from ally.knowledge import query_canon
 from ally.memory import MemoryStore
 from ally.passes import pass_record
+from ally.retrieval import RetrievalQuery, StructuredRetriever, prefer_primary
 
 
 def next_stage(current: Stage) -> Stage | None:
@@ -127,10 +128,26 @@ class AllySession:
 
 
 def run_vertical_slice(
-    human: HumanInput, *, memory: MemoryStore | None = None
+    human: HumanInput,
+    *,
+    memory: MemoryStore | None = None,
+    retriever: StructuredRetriever | None = None,
 ) -> AllySession:
     """Discovery → Counsel → Retrieval → Reconciliation → Human Lock interrupt."""
     claims, quarantine = ingest_envelopes(human.envelopes)
+    if retriever is not None:
+        primary, held_primary = ingest_envelopes(
+            retriever.fetch(
+                RetrievalQuery(
+                    brand_id=human.brand_id,
+                    task=human.task,
+                    nct_id=human.nct_id,
+                )
+            )
+        )
+        claims, superseded = prefer_primary(claims, primary)
+        quarantine = [*quarantine, *held_primary, *superseded]
+        claims = [*claims, *primary]
     diagnosis = AllyStrategicDiagnosis(
         client_id=human.client_id,
         brand_id=human.brand_id,
@@ -193,12 +210,10 @@ def _hold_inferred_contradictions(
     for claim in diagnosis.claims:
         if claim.id in inferred_ids:
             held.append(
-                QuarantineRecord(
-                    reason=QuarantineReason.CROSS_CLAIM,
-                    source=claim.source,
-                    origin_agent=claim.origin_agent,
-                    text=claim.text,
-                    detail=detail_by_id[claim.id],
+                QuarantineRecord.hold_claim(
+                    claim,
+                    QuarantineReason.CROSS_CLAIM,
+                    detail_by_id[claim.id],
                 )
             )
         else:

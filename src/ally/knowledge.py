@@ -8,22 +8,6 @@ from dataclasses import dataclass
 from ally.enums import EstimandBasis, Genre
 from ally.exceptions import RefusalError
 
-_FIREWALL_TERMS = (
-    "comprising",
-    "embodiment",
-    "prior art",
-    "prosecution history",
-    "office action",
-    "freedom to operate",
-    "non-obvious",
-    "claim 1",
-    "dependent claim",
-    "independent claim",
-    "patent family",
-    "file wrapper",
-    "means-plus-function",
-)
-
 _COMPLETED_ACTION = (
     "has approved",
     "approves",
@@ -115,11 +99,6 @@ def query_canon(*rule_ids: str) -> list[CanonRule]:
     if missing:
         raise RefusalError(f"Unknown Canon rule ids: {', '.join(missing)}")
     return found
-
-
-def firewall_hits(text: str) -> list[str]:
-    lowered = text.lower()
-    return [term for term in _FIREWALL_TERMS if term in lowered]
 
 
 def first_sentence(text: str) -> str:
