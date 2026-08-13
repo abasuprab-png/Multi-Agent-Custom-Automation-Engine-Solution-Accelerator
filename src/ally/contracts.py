@@ -2,21 +2,24 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 from ally.enums import (
     AllyPass,
+    ChecklistAnswer,
     ClaimSource,
     CritiqueCode,
     EpistemicStatus,
     EstimandBasis,
+    ExecutionAgent,
     Genre,
     QuarantineReason,
-    Stage,
 )
 
 
@@ -32,18 +35,9 @@ class PassConfig(BaseModel):
     """Inference parameters for one Ally internal pass. Reconciliation is not cheaper."""
 
     ally_pass: AllyPass
-    stages: tuple[Stage, ...]
     model_tier: Literal["frontier_reasoning"] = "frontier_reasoning"
-    temperature_min: float
-    temperature_max: float
-    extended_thinking: bool = True
+    temperature: float
     thinking_budget: Literal["generous", "tight"]
-
-    @model_validator(mode="after")
-    def _temp_window(self) -> PassConfig:
-        if self.temperature_min > self.temperature_max:
-            raise ValueError("temperature_min must be <= temperature_max")
-        return self
 
 
 class PassRecord(BaseModel):
@@ -98,6 +92,21 @@ class QuarantineRecord(BaseModel):
     detail: str
     held_at: datetime = Field(default_factory=_utcnow)
 
+    @classmethod
+    def hold(
+        cls,
+        envelope: InboundEnvelope,
+        reason: QuarantineReason,
+        detail: str,
+    ) -> QuarantineRecord:
+        return cls(
+            reason=reason,
+            source=envelope.source,
+            origin_agent=envelope.origin_agent,
+            text=envelope.text,
+            detail=detail,
+        )
+
 
 class OpenVerificationItem(BaseModel):
     id: str = Field(default_factory=lambda: _new_id("ov"))
@@ -111,7 +120,6 @@ class OpenDecisionPoint(BaseModel):
 
     id: str = Field(default_factory=lambda: _new_id("od"))
     prompt: str
-    blocking: bool = True
     related_claim_ids: list[str] = Field(default_factory=list)
     related_codes: list[CritiqueCode] = Field(default_factory=list)
 
@@ -122,24 +130,24 @@ class AllyMessageSpineCandidate(BaseModel):
     id: str = Field(default_factory=lambda: _new_id("spine"))
     genre: Genre
     lede: str
-    catalyst_external: bool | None = None
-    catalyst_dated: bool | None = None
+    catalyst_external: ChecklistAnswer = ChecklistAnswer.UNANSWERED
+    catalyst_dated: ChecklistAnswer = ChecklistAnswer.UNANSWERED
     catalyst_date: str | None = None
-    tension_market_held: bool | None = None
+    tension_market_held: ChecklistAnswer = ChecklistAnswer.UNANSWERED
     tension_observable_marker: str | None = None
     claim_ids: list[str] = Field(default_factory=list)
 
     def catalyst_admissible(self) -> bool:
-        return bool(
-            self.catalyst_external is True
-            and self.catalyst_dated is True
-            and self.catalyst_date
+        return (
+            self.catalyst_external is ChecklistAnswer.YES
+            and self.catalyst_dated is ChecklistAnswer.YES
+            and bool(self.catalyst_date)
         )
 
     def tension_admissible(self) -> bool:
-        return bool(
-            self.tension_market_held is True
-            and (self.tension_observable_marker or "").strip()
+        return (
+            self.tension_market_held is ChecklistAnswer.YES
+            and bool((self.tension_observable_marker or "").strip())
         )
 
 
@@ -147,7 +155,6 @@ class CritiqueIssue(BaseModel):
     code: CritiqueCode
     rule_id: str
     message: str
-    blocking: bool = True
     claim_ids: list[str] = Field(default_factory=list)
     spine_id: str | None = None
 
@@ -157,12 +164,8 @@ class CritiqueReport(BaseModel):
     ran_at: datetime = Field(default_factory=_utcnow)
 
     @property
-    def blocking(self) -> list[CritiqueIssue]:
-        return [issue for issue in self.issues if issue.blocking]
-
-    @property
     def passed(self) -> bool:
-        return not self.blocking
+        return not self.issues
 
 
 class AllyStrategicDiagnosis(BaseModel):
@@ -188,6 +191,11 @@ class AllyStrategicDiagnosis(BaseModel):
     def unresolved_verification(self) -> list[OpenVerificationItem]:
         return [item for item in self.open_verification if not item.resolved]
 
+    def digest(self) -> str:
+        payload = self.model_dump(mode="json", exclude={"created_at", "pass_history"})
+        canonical = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
 
 class HumanStrategicLock(BaseModel):
     """Object-model gate. Execution constructors must require this, not a prompt."""
@@ -196,7 +204,6 @@ class HumanStrategicLock(BaseModel):
     signed_by: str
     signature: str
     closed_decision_ids: list[str] = Field(default_factory=list)
-    accepted_unresolved_ids: list[str] = Field(default_factory=list)
     signed_at: datetime = Field(default_factory=_utcnow)
 
     @field_validator("signature", "signed_by", "diagnosis_digest")
@@ -208,7 +215,6 @@ class HumanStrategicLock(BaseModel):
 
 
 class HumanHandoff(BaseModel):
-    kind: Literal["human_strategic_lock_interrupt"] = "human_strategic_lock_interrupt"
     diagnosis: AllyStrategicDiagnosis
     critique: CritiqueReport
     quarantine: list[QuarantineRecord] = Field(default_factory=list)
@@ -224,29 +230,18 @@ class DelegationBrief(BaseModel):
     allowed_identities: list[str] = Field(default_factory=list)
     unresolved: list[str] = Field(default_factory=list)
     inferred: list[str] = Field(default_factory=list)
-    do_not_infer_identity: Literal[True] = True
-    do_not_infer_facts_beyond_stated: Literal[True] = True
 
 
 class AgentHandoff(BaseModel):
-    """Every inter-agent handoff is this object. Never free text."""
+    """Lexie/RCC payload. A missing lock is a schema error, not a runtime warning."""
 
-    from_agent: str
-    to_agent: str
+    from_agent: Literal["ally"] = "ally"
+    to_agent: ExecutionAgent
     diagnosis_id: str
     claims: list[Claim]
     unresolved: list[str] = Field(default_factory=list)
     inferred: list[str] = Field(default_factory=list)
-    lock: HumanStrategicLock | None = None
-    payload: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _execution_requires_lock(self) -> AgentHandoff:
-        if self.to_agent.lower() in {"lexie", "rcc", "execution"} and self.lock is None:
-            raise ValueError(
-                "Lexie/RCC cannot receive a diagnosis lacking a lock signature"
-            )
-        return self
+    lock: HumanStrategicLock
 
 
 class HumanInput(BaseModel):
@@ -257,7 +252,6 @@ class HumanInput(BaseModel):
     envelopes: list[InboundEnvelope] = Field(default_factory=list)
     open_verification: list[OpenVerificationItem] = Field(default_factory=list)
     spine: AllyMessageSpineCandidate | None = None
-    allowed_identities: list[str] = Field(default_factory=list)
 
     @field_validator("client_id", "brand_id", "lead_id", "task")
     @classmethod
@@ -265,14 +259,3 @@ class HumanInput(BaseModel):
         if not value.strip():
             raise ValueError("client_id, brand_id, lead_id, and task are required")
         return value.strip()
-
-
-class SliceResult(BaseModel):
-    status: Literal["awaiting_human_lock", "quarantined", "refused", "execution_ready"]
-    session_id: str
-    stage: Stage
-    diagnosis: AllyStrategicDiagnosis | None = None
-    critique: CritiqueReport | None = None
-    handoff: HumanHandoff | None = None
-    quarantine: list[QuarantineRecord] = Field(default_factory=list)
-    refusal: str | None = None

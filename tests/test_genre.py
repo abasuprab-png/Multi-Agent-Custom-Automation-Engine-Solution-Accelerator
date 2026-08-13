@@ -23,12 +23,10 @@ def test_atmospheric_lede_fails_genre_check():
 
 
 def test_planted_spine_fails_genre_in_slice():
-    _, result = run_vertical_slice(gi_ae_contradiction_input())
-    assert result.critique is not None
-    assert any(issue.code is CritiqueCode.GENRE for issue in result.critique.blocking)
+    session = run_vertical_slice(gi_ae_contradiction_input())
+    assert any(issue.code is CritiqueCode.GENRE for issue in session.critique.issues)
 
 
 def test_happy_path_lede_passes_genre():
-    _, result = run_vertical_slice(happy_path_input())
-    assert result.critique is not None
-    assert all(issue.code is not CritiqueCode.GENRE for issue in result.critique.issues)
+    session = run_vertical_slice(happy_path_input())
+    assert all(issue.code is not CritiqueCode.GENRE for issue in session.critique.issues)

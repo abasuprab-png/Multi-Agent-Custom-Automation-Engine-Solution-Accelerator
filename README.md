@@ -34,7 +34,7 @@ pytest
 from ally import run_vertical_slice
 from ally.fixtures import gi_ae_contradiction_input, happy_path_input
 
-session, result = run_vertical_slice(gi_ae_contradiction_input())
-assert result.stage.value == "human_strategic_lock"
-assert result.handoff is not None
+session = run_vertical_slice(gi_ae_contradiction_input())
+assert session.stage.value == "human_strategic_lock"
+assert session.lock is None
 ```

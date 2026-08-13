@@ -16,21 +16,20 @@ def test_required_prompt_sections_are_present():
 
 def test_reconciliation_is_same_tier_colder_not_cheaper():
     assert DISCOVERY_COUNSEL.model_tier == EVIDENCE_RECONCILIATION.model_tier == "frontier_reasoning"
-    assert EVIDENCE_RECONCILIATION.temperature_max <= 0.1
-    assert DISCOVERY_COUNSEL.temperature_min >= 0.3
+    assert EVIDENCE_RECONCILIATION.temperature <= 0.1
+    assert DISCOVERY_COUNSEL.temperature >= 0.3
     assert EVIDENCE_RECONCILIATION.thinking_budget == "tight"
     assert DISCOVERY_COUNSEL.thinking_budget == "generous"
 
 
 def test_slice_records_both_passes():
-    _, result = run_vertical_slice(happy_path_input())
-    assert result.diagnosis is not None
-    passes = [record.ally_pass for record in result.diagnosis.pass_history]
+    session = run_vertical_slice(happy_path_input())
+    passes = [record.ally_pass for record in session.diagnosis.pass_history]
     assert AllyPass.DISCOVERY_COUNSEL in passes
     assert AllyPass.EVIDENCE_RECONCILIATION in passes
     recon = next(
         record
-        for record in result.diagnosis.pass_history
+        for record in session.diagnosis.pass_history
         if record.ally_pass is AllyPass.EVIDENCE_RECONCILIATION
     )
     assert recon.temperature <= 0.1

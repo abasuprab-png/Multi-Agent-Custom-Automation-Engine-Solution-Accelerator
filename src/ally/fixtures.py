@@ -6,7 +6,13 @@ from ally.contracts import (
     InboundEnvelope,
     OpenVerificationItem,
 )
-from ally.enums import ClaimSource, EpistemicStatus, EstimandBasis, Genre
+from ally.enums import (
+    ChecklistAnswer,
+    ClaimSource,
+    EpistemicStatus,
+    EstimandBasis,
+    Genre,
+)
 
 
 def gi_ae_contradiction_input() -> HumanInput:
@@ -29,9 +35,6 @@ def gi_ae_contradiction_input() -> HumanInput:
                 "A new chapter in obesity care is beginning as patients look toward "
                 "next-generation options."
             ),
-            catalyst_external=None,
-            catalyst_dated=None,
-            tension_market_held=None,
         ),
         envelopes=[
             InboundEnvelope(
@@ -99,10 +102,10 @@ def happy_path_input() -> HumanInput:
                 "The FDA has approved exampletide 2.4 mg for chronic weight management "
                 "in adults with obesity."
             ),
-            catalyst_external=True,
-            catalyst_dated=True,
+            catalyst_external=ChecklistAnswer.YES,
+            catalyst_dated=ChecklistAnswer.YES,
             catalyst_date="2026-03-12",
-            tension_market_held=True,
+            tension_market_held=ChecklistAnswer.YES,
             tension_observable_marker=(
                 "IQVIA TRx Feb 2026: GLP-1 obesity class share concentrated in two incumbents"
             ),

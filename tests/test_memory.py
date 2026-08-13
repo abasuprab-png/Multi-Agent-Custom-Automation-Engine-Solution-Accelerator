@@ -7,14 +7,12 @@ from ally.runtime import run_vertical_slice
 
 
 def test_monotherapy_arm_figures_do_not_vanish():
-    _, result = run_vertical_slice(gi_ae_contradiction_input())
-    assert result.diagnosis is not None
-    labels = [item.label for item in result.diagnosis.unresolved_verification()]
+    session = run_vertical_slice(gi_ae_contradiction_input())
+    labels = [item.label for item in session.diagnosis.unresolved_verification()]
     assert "monotherapy-arm-figures" in labels
-    assert result.handoff is not None
     assert any(
         "monotherapy-arm-figures" in point.prompt
-        for point in result.handoff.open_decision_points
+        for point in session.handoff.open_decision_points
     )
 
 

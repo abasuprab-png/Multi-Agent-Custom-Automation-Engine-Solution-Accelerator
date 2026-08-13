@@ -11,7 +11,7 @@ from ally.contracts import (
     CritiqueIssue,
     CritiqueReport,
 )
-from ally.enums import CritiqueCode, EpistemicStatus, Genre
+from ally.enums import ChecklistAnswer, CritiqueCode, EpistemicStatus, Genre
 from ally.knowledge import firewall_hits, genre_lede_ok, query_canon
 
 _EFFICACY_HINT = re.compile(
@@ -56,16 +56,15 @@ def run_self_critique(diagnosis: AllyStrategicDiagnosis) -> CritiqueReport:
 
 def _admissibility(diagnosis: AllyStrategicDiagnosis) -> list[CritiqueIssue]:
     adm1, adm2 = query_canon("ADM-1", "ADM-2")
-    issues: list[CritiqueIssue] = []
     if not diagnosis.spine_candidates:
-        issues.append(
+        return [
             CritiqueIssue(
                 code=CritiqueCode.ADMISSIBILITY_CATALYST,
                 rule_id=adm1.id,
                 message="No spine candidate to run Admissibility against.",
             )
-        )
-        return issues
+        ]
+    issues: list[CritiqueIssue] = []
     for spine in diagnosis.spine_candidates:
         if spine.genre is Genre.STRATEGIC_COUNSEL:
             continue
@@ -77,7 +76,10 @@ def _spine_admissibility(
     spine: AllyMessageSpineCandidate, adm1: str, adm2: str
 ) -> list[CritiqueIssue]:
     issues: list[CritiqueIssue] = []
-    if spine.catalyst_external is None or spine.catalyst_dated is None:
+    if (
+        spine.catalyst_external is ChecklistAnswer.UNANSWERED
+        or spine.catalyst_dated is ChecklistAnswer.UNANSWERED
+    ):
         issues.append(
             CritiqueIssue(
                 code=CritiqueCode.ADMISSIBILITY_CATALYST,
@@ -97,12 +99,12 @@ def _spine_admissibility(
                 spine_id=spine.id,
                 message=(
                     "Inadmissible: catalyst is not external and dated "
-                    f"(external={spine.catalyst_external}, dated={spine.catalyst_dated}, "
-                    f"date={spine.catalyst_date!r})."
+                    f"(external={spine.catalyst_external.value}, "
+                    f"dated={spine.catalyst_dated.value}, date={spine.catalyst_date!r})."
                 ),
             )
         )
-    if spine.tension_market_held is None:
+    if spine.tension_market_held is ChecklistAnswer.UNANSWERED:
         issues.append(
             CritiqueIssue(
                 code=CritiqueCode.ADMISSIBILITY_TENSION,
@@ -122,7 +124,7 @@ def _spine_admissibility(
                 spine_id=spine.id,
                 message=(
                     "Inadmissible: tension is not market-held with an observable marker "
-                    f"(held={spine.tension_market_held}, "
+                    f"(held={spine.tension_market_held.value}, "
                     f"marker={spine.tension_observable_marker!r})."
                 ),
             )
@@ -155,19 +157,22 @@ def _estimand(claims: list[Claim]) -> list[CritiqueIssue]:
     for claim in claims:
         if claim.epistemic is EpistemicStatus.UNRESOLVED:
             continue
-        if _PERCENT.search(claim.text) and _EFFICACY_HINT.search(claim.text):
-            if claim.estimand is None:
-                issues.append(
-                    CritiqueIssue(
-                        code=CritiqueCode.ESTIMAND,
-                        rule_id="EST-1",
-                        claim_ids=[claim.id],
-                        message=(
-                            "Efficacy percentage without estimand basis "
-                            "(trial-product, treatment-policy, or treatment-regimen)."
-                        ),
-                    )
+        if (
+            _PERCENT.search(claim.text)
+            and _EFFICACY_HINT.search(claim.text)
+            and claim.estimand is None
+        ):
+            issues.append(
+                CritiqueIssue(
+                    code=CritiqueCode.ESTIMAND,
+                    rule_id="EST-1",
+                    claim_ids=[claim.id],
+                    message=(
+                        "Efficacy percentage without estimand basis "
+                        "(trial-product, treatment-policy, or treatment-regimen)."
+                    ),
                 )
+            )
     return issues
 
 

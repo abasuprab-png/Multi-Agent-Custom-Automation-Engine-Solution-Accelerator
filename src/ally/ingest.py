@@ -12,6 +12,22 @@ from ally.enums import EpistemicStatus, QuarantineReason
 from ally.knowledge import firewall_hits
 
 
+def ingest_envelopes(
+    envelopes: list[InboundEnvelope],
+    *,
+    brief: DelegationBrief | None = None,
+) -> tuple[list[Claim], list[QuarantineRecord]]:
+    claims: list[Claim] = []
+    held: list[QuarantineRecord] = []
+    for envelope in envelopes:
+        item = ingest_envelope(envelope, brief=brief)
+        if isinstance(item, QuarantineRecord):
+            held.append(item)
+        else:
+            claims.append(item)
+    return claims, held
+
+
 def ingest_envelope(
     envelope: InboundEnvelope,
     *,
@@ -19,22 +35,18 @@ def ingest_envelope(
 ) -> Claim | QuarantineRecord:
     """Apply the one trust rule. Source does not grant truth."""
     if envelope.epistemic is None:
-        return QuarantineRecord(
-            reason=QuarantineReason.MISSING_EPISTEMIC,
-            source=envelope.source,
-            origin_agent=envelope.origin_agent,
-            text=envelope.text,
-            detail="Payload had no verified/inferred/unresolved tag. Held, not ingested.",
+        return QuarantineRecord.hold(
+            envelope,
+            QuarantineReason.MISSING_EPISTEMIC,
+            "Payload had no verified/inferred/unresolved tag. Held, not ingested.",
         )
 
     hits = firewall_hits(envelope.text)
     if hits:
-        return QuarantineRecord(
-            reason=QuarantineReason.VOCAB_FIREWALL,
-            source=envelope.source,
-            origin_agent=envelope.origin_agent,
-            text=envelope.text,
-            detail=f"Patent-prosecution vocabulary blocked on ingest: {', '.join(hits)}",
+        return QuarantineRecord.hold(
+            envelope,
+            QuarantineReason.VOCAB_FIREWALL,
+            f"Patent-prosecution vocabulary blocked on ingest: {', '.join(hits)}",
         )
 
     if brief is not None:
@@ -56,6 +68,16 @@ def ingest_envelope(
     )
 
 
+def inferred_texts(claims: list[Claim]) -> list[str]:
+    return [claim.text for claim in claims if claim.epistemic is EpistemicStatus.INFERRED]
+
+
+def unresolved_texts(claims: list[Claim]) -> list[str]:
+    return [
+        claim.text for claim in claims if claim.epistemic is EpistemicStatus.UNRESOLVED
+    ]
+
+
 def _identity_inference(
     envelope: InboundEnvelope, brief: DelegationBrief
 ) -> QuarantineRecord | None:
@@ -64,15 +86,11 @@ def _identity_inference(
     allowed = {item.lower() for item in brief.allowed_identities}
     if envelope.inferred_identity.lower() in allowed:
         return None
-    return QuarantineRecord(
-        reason=QuarantineReason.IDENTITY_INFERENCE,
-        source=envelope.source,
-        origin_agent=envelope.origin_agent,
-        text=envelope.text,
-        detail=(
-            f"Delegated agent inferred identity '{envelope.inferred_identity}' "
-            "beyond what the brief stated."
-        ),
+    return QuarantineRecord.hold(
+        envelope,
+        QuarantineReason.IDENTITY_INFERENCE,
+        f"Delegated agent inferred identity '{envelope.inferred_identity}' "
+        "beyond what the brief stated.",
     )
 
 
@@ -85,20 +103,8 @@ def _unstated_facts(
     novel = [fact for fact in envelope.extra_facts if fact.strip().lower() not in stated]
     if not novel:
         return None
-    return QuarantineRecord(
-        reason=QuarantineReason.UNSTATED_FACT,
-        source=envelope.source,
-        origin_agent=envelope.origin_agent,
-        text=envelope.text,
-        detail="Delegated agent introduced facts beyond the brief: " + "; ".join(novel),
+    return QuarantineRecord.hold(
+        envelope,
+        QuarantineReason.UNSTATED_FACT,
+        "Delegated agent introduced facts beyond the brief: " + "; ".join(novel),
     )
-
-
-def inferred_texts(claims: list[Claim]) -> list[str]:
-    return [claim.text for claim in claims if claim.epistemic is EpistemicStatus.INFERRED]
-
-
-def unresolved_texts(claims: list[Claim]) -> list[str]:
-    return [
-        claim.text for claim in claims if claim.epistemic is EpistemicStatus.UNRESOLVED
-    ]

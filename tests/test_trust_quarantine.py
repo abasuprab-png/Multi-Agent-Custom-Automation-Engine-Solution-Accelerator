@@ -12,13 +12,16 @@ from ally.runtime import run_vertical_slice
 
 
 def test_untagged_agent_output_is_quarantined():
-    session, result = run_vertical_slice(gi_ae_contradiction_input())
-    reasons = {record.reason for record in result.quarantine}
+    session = run_vertical_slice(gi_ae_contradiction_input())
+    reasons = {record.reason for record in session.quarantine}
     assert QuarantineReason.MISSING_EPISTEMIC in reasons
-    held = [record for record in session.quarantine if record.reason is QuarantineReason.MISSING_EPISTEMIC]
+    held = [
+        record
+        for record in session.quarantine
+        if record.reason is QuarantineReason.MISSING_EPISTEMIC
+    ]
     assert any("best-in-class" in record.text for record in held)
-    assert result.diagnosis is not None
-    assert all("unanimously" not in claim.text for claim in result.diagnosis.claims)
+    assert all("unanimously" not in claim.text for claim in session.diagnosis.claims)
 
 
 def test_human_web_and_agent_use_the_same_epistemic_field():

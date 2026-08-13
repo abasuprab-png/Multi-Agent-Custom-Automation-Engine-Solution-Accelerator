@@ -11,22 +11,22 @@ from ally.contracts import (
     HumanInput,
     HumanStrategicLock,
     InboundEnvelope,
-    SliceResult,
 )
 from ally.enums import (
     AllyPass,
+    ChecklistAnswer,
     ClaimSource,
     CritiqueCode,
     EpistemicStatus,
     EstimandBasis,
+    ExecutionAgent,
     Genre,
-    LockState,
     Stage,
 )
 from ally.exceptions import LockGateError, RefusalError, SequenceLockError
 from ally.memory import MemoryStore
 from ally.prompts import SYSTEM_PROMPT
-from ally.runtime import AllySession, diagnosis_digest, run_vertical_slice
+from ally.runtime import AllySession, assert_transition, run_vertical_slice
 
 __all__ = [
     "AgentHandoff",
@@ -34,6 +34,7 @@ __all__ = [
     "AllyPass",
     "AllySession",
     "AllyStrategicDiagnosis",
+    "ChecklistAnswer",
     "Claim",
     "ClaimSource",
     "CritiqueCode",
@@ -41,19 +42,18 @@ __all__ = [
     "DelegationBrief",
     "EpistemicStatus",
     "EstimandBasis",
+    "ExecutionAgent",
     "Genre",
     "HumanHandoff",
     "HumanInput",
     "HumanStrategicLock",
     "InboundEnvelope",
     "LockGateError",
-    "LockState",
     "MemoryStore",
     "RefusalError",
     "SYSTEM_PROMPT",
     "SequenceLockError",
-    "SliceResult",
     "Stage",
-    "diagnosis_digest",
+    "assert_transition",
     "run_vertical_slice",
 ]

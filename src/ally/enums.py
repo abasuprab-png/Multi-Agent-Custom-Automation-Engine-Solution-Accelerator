@@ -31,10 +31,17 @@ class EpistemicStatus(str, Enum):
     UNRESOLVED = "unresolved"
 
 
-class LockState(str, Enum):
-    NOT_REACHED = "not_reached"
-    AWAITING_SIGNATURE = "awaiting_signature"
-    SIGNED = "signed"
+class ChecklistAnswer(str, Enum):
+    """Admissibility answers. None is not a legal stand-in for unanswered."""
+
+    UNANSWERED = "unanswered"
+    YES = "yes"
+    NO = "no"
+
+
+class ExecutionAgent(str, Enum):
+    LEXIE = "lexie"
+    RCC = "rcc"
 
 
 class Genre(str, Enum):
@@ -52,8 +59,6 @@ class CritiqueCode(str, Enum):
     INTENSIFIER = "intensifier"
     GENRE = "genre"
     VOCAB_FIREWALL = "vocab_firewall"
-    MISSING_EPISTEMIC = "missing_epistemic"
-    IDENTITY_INFERENCE = "identity_inference"
     UNRESOLVED_OPEN = "unresolved_open"
 
 
