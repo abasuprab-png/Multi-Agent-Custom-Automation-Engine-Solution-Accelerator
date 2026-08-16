@@ -32,12 +32,19 @@ def _new_id(prefix: str) -> str:
 
 
 class PassConfig(BaseModel):
-    """Inference parameters for one Ally internal pass. Reconciliation is not cheaper."""
+    """Inference parameters for one Ally internal pass.
+
+    Thinking (Discovery+Counsel) uses gpt-5.6-sol. Doing (Evidence
+    Reconciliation) uses gpt-5.6-terra. Both stay Direct-from-Azure
+    frontier 5.6 — not a mini/nano and not Claude.
+    """
 
     ally_pass: AllyPass
     model_tier: Literal["frontier_reasoning"] = "frontier_reasoning"
     temperature: float
     thinking_budget: Literal["generous", "tight"]
+    work: Literal["thinking", "doing"]
+    deployment_name: str
 
 
 class PassRecord(BaseModel):
@@ -45,6 +52,10 @@ class PassRecord(BaseModel):
     model_tier: str
     temperature: float
     thinking_budget: str
+    work: Literal["thinking", "doing"] = "thinking"
+    deployment: str | None = None
+    live: bool = False
+    error: str | None = None
     ran_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -191,6 +202,8 @@ class AllyStrategicDiagnosis(BaseModel):
     open_decision_points: list[OpenDecisionPoint] = Field(default_factory=list)
     canon_citations: list[str] = Field(default_factory=list)
     pass_history: list[PassRecord] = Field(default_factory=list)
+    counsel_notes: str | None = None
+    reconciliation_notes: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
     def claim_by_id(self, claim_id: str) -> Claim | None:

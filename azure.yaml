@@ -29,8 +29,12 @@ services:
       - protocol: invocations
         version: 2.0.0
     environmentVariables:
-      - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
-        value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
+      - name: ALLY_LIVE_LLM
+        value: "1"
+      - name: AZURE_AI_THINKING_DEPLOYMENT
+        value: gpt-5.6-sol
+      - name: AZURE_AI_DOING_DEPLOYMENT
+        value: gpt-5.6-terra
     container:
       resources:
         cpu: "0.5"

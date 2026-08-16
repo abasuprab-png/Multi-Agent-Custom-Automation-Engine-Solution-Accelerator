@@ -27,8 +27,8 @@ from ally.enums import (
 from ally.exceptions import LockGateError, SequenceLockError
 from ally.ingest import ingest_envelopes, inferred_texts, unresolved_texts
 from ally.knowledge import query_canon
+from ally.llm import AllyLLM, llm_from_env
 from ally.memory import MemoryStore
-from ally.passes import pass_record
 from ally.retrieval import RetrievalQuery, StructuredRetriever, prefer_primary
 
 
@@ -132,8 +132,10 @@ def run_vertical_slice(
     *,
     memory: MemoryStore | None = None,
     retriever: StructuredRetriever | None = None,
+    llm: AllyLLM | None = None,
 ) -> AllySession:
     """Discovery → Counsel → Retrieval → Reconciliation → Human Lock interrupt."""
+    runner = llm if llm is not None else llm_from_env()
     claims, quarantine = ingest_envelopes(human.envelopes)
     if retriever is not None:
         primary, held_primary = ingest_envelopes(
@@ -148,19 +150,32 @@ def run_vertical_slice(
         claims, superseded = prefer_primary(claims, primary)
         quarantine = [*quarantine, *held_primary, *superseded]
         claims = [*claims, *primary]
+    spines = [human.spine] if human.spine is not None else []
+    counsel_record, counsel = runner.run_pass(
+        AllyPass.DISCOVERY_COUNSEL,
+        human=human,
+        claims=claims,
+        spines=spines,
+    )
+    recon_record, recon = runner.run_pass(
+        AllyPass.EVIDENCE_RECONCILIATION,
+        human=human,
+        claims=claims,
+        spines=spines,
+        prior_notes=counsel.notes if counsel is not None else None,
+    )
     diagnosis = AllyStrategicDiagnosis(
         client_id=human.client_id,
         brand_id=human.brand_id,
         lead_id=human.lead_id,
         task=human.task,
         claims=claims,
-        spine_candidates=[human.spine] if human.spine is not None else [],
+        spine_candidates=spines,
         open_verification=list(human.open_verification),
         canon_citations=[rule.id for rule in query_canon("ADM-1", "ADM-2")],
-        pass_history=[
-            pass_record(AllyPass.DISCOVERY_COUNSEL),
-            pass_record(AllyPass.EVIDENCE_RECONCILIATION),
-        ],
+        pass_history=[counsel_record, recon_record],
+        counsel_notes=counsel.notes if counsel is not None else None,
+        reconciliation_notes=recon.notes if recon is not None else None,
     )
     critique = run_self_critique(diagnosis)
     diagnosis, held = _hold_inferred_contradictions(diagnosis, critique)

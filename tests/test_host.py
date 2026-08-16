@@ -9,6 +9,8 @@ from ally.fixtures import gi_ae_contradiction_input
 from ally.foundry import AllyInvokeRequest, InvokeOp, SessionStore, handle_invoke
 from ally.foundry_project import (
     ACCOUNT_NAME,
+    MODEL_DOING_DEPLOYMENT,
+    MODEL_THINKING_DEPLOYMENT,
     PROJECT_ENDPOINT,
     PROJECT_NAME,
     PROJECT_RESOURCE_ID,
@@ -24,6 +26,8 @@ def test_host_targets_commsos_prod_not_a_second_account():
     assert PROJECT_ENDPOINT.endswith("/api/projects/commsos-prod")
     assert "commsos-prod-resource" in PROJECT_RESOURCE_ID
     assert "CommsOS-Core" not in PROJECT_RESOURCE_ID
+    assert MODEL_THINKING_DEPLOYMENT == "gpt-5.6-sol"
+    assert MODEL_DOING_DEPLOYMENT == "gpt-5.6-terra"
 
 
 def test_session_survives_new_store_on_disk(tmp_path: Path):

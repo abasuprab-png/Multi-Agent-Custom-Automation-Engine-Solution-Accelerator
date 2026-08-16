@@ -15,3 +15,7 @@ PROJECT_RESOURCE_ID = (
 AGENT_NAME = "ally"
 DEFAULT_LISTEN_HOST = "0.0.0.0"
 DEFAULT_LISTEN_PORT = 8088
+# User split: Sol thinks (Discovery+Counsel), Terra does (Evidence Reconciliation).
+# Both are Direct-from-Azure GPT-5.6 and draw sponsorship credits. Not Claude.
+MODEL_THINKING_DEPLOYMENT = "gpt-5.6-sol"
+MODEL_DOING_DEPLOYMENT = "gpt-5.6-terra"
