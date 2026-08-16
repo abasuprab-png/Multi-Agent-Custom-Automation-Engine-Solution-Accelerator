@@ -3,21 +3,31 @@ environments:
   prod:
     projectEndpoint: https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod
     agentName: ally
-    agentVersion: "1"
+    agentVersion: "3"
     agentGuid: 48aa4ee2-2ca8-4bd1-93aa-e1153e6dc192
     azureContainerRegistry: allyruntimeeus2.azurecr.io
-    image: allyruntimeeus2.azurecr.io/ally:202608161007
+    image: allyruntimeeus2.azurecr.io/ally:202608161055
     cpu: "0.5"
     memory: 1Gi
     protocols:
       - protocol: invocations
         version: 2.0.0
+    environmentVariables:
+      ALLY_LIVE_LLM: "1"
+      AZURE_AI_THINKING_DEPLOYMENT: gpt-5.6-sol
+      AZURE_AI_DOING_DEPLOYMENT: gpt-5.6-terra
     evaluationSuites: []
     provenInvoke:
       start:
         stage: human_strategic_lock
         interrupt: true
         agentHandoff: null
+        thinking:
+          deployment: gpt-5.6-sol
+          live: true
+        doing:
+          deployment: gpt-5.6-terra
+          live: true
       unsignedEnterExecution:
         errorType: LockGateError
         interrupt: true
