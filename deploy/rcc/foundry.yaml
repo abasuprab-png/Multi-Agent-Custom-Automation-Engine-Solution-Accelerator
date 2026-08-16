@@ -1,0 +1,22 @@
+# Foundry registration for hosted RCC on existing commsos-prod.
+# Build from repo root: docker build -f deploy/rcc/Dockerfile -t allyruntimeeus2.azurecr.io/rcc:<tag> .
+projectEndpoint: https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod
+accountName: commsos-prod-resource
+resourceGroup: rg-rag-prototype
+agentName: rcc
+azureContainerRegistry: allyruntimeeus2.azurecr.io
+image: allyruntimeeus2.azurecr.io/rcc:pending
+cpu: "0.5"
+memory: 1Gi
+protocols:
+  - protocol: invocations
+    version: "2.0.0"
+environmentVariables:
+  ALLY_AGENT: rcc
+  ALLY_STDLIB_HOST: "0"
+# Set ALLY_LOCK_HMAC_SECRET (or Entra OIDC env) on the hosted container.
+# Do not commit secrets. Unsigned or free-text invocations must throw RefusalError / LockGateError.
+refusal:
+  accepts: AgentHandoff
+  unsigned: LockGateError
+  freeText: RefusalError

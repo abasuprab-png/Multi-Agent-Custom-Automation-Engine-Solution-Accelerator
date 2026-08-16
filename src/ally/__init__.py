@@ -35,6 +35,7 @@ from ally.foundry import (
     handle_invoke,
 )
 from ally.foundry_project import PROJECT_ENDPOINT, PROJECT_NAME
+from ally.lock import signed_lock, verify_lock
 from ally.writer import CraftFinding, review_draft
 from ally.runtime import AllySession, assert_transition, run_vertical_slice
 
@@ -73,6 +74,8 @@ __all__ = [
     "ClinicalTrialsFixture",
     "RetrievalQuery",
     "SYSTEM_PROMPT",
+    "signed_lock",
+    "verify_lock",
     "SequenceLockError",
     "Stage",
     "assert_transition",

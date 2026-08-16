@@ -25,6 +25,7 @@ from ally.enums import (
     Stage,
 )
 from ally.exceptions import LockGateError, SequenceLockError
+from ally.lock import verify_lock
 from ally.ingest import ingest_envelopes, inferred_texts, unresolved_texts
 from ally.cams import CamsReader
 from ally.clinical import retriever_from_env
@@ -85,10 +86,7 @@ class AllySession:
                 f"Lock requires stage {Stage.HUMAN_STRATEGIC_LOCK.value}, "
                 f"current is {self.stage.value}"
             )
-        if lock.diagnosis_digest != self.diagnosis.digest():
-            raise LockGateError(
-                "Lock diagnosis_digest does not match the session diagnosis"
-            )
+        verify_lock(lock, self.diagnosis.digest())
         leftover = {
             point.id for point in self.diagnosis.open_decision_points
         } - set(lock.closed_decision_ids)
@@ -126,8 +124,7 @@ class AllySession:
             raise LockGateError(
                 "Lexie/RCC cannot receive a diagnosis lacking a lock signature"
             )
-        if self.lock.diagnosis_digest != self.diagnosis.digest():
-            raise LockGateError("Lock signature does not match the current diagnosis")
+        verify_lock(self.lock, self.diagnosis.digest())
         return self.lock
 
     def _record_lock_overrides(self, lock: HumanStrategicLock) -> None:

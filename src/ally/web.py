@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Protocol
 from urllib.parse import urlparse
 
+import httpx
+
 from ally.contracts import HumanInput, InboundEnvelope
 from ally.enums import ClaimSource, EpistemicStatus
 from ally.firewall import hits as firewall_hits
+from ally.retrieval import retrieval_timeout, unresolved_envelope
 
 ENV_LIVE_WEB = "ALLY_LIVE_WEB"
 
@@ -45,11 +49,20 @@ class StaticSearcher:
 class HttpFetcher:
     def fetch(self, url: str) -> InboundEnvelope:
         try:
-            import httpx
-        except ImportError as exc:
-            raise RuntimeError("httpx is required for live fetch") from exc
-        response = httpx.get(url, follow_redirects=True, timeout=20.0)
-        response.raise_for_status()
+            response = httpx.get(
+                url, follow_redirects=True, timeout=retrieval_timeout()
+            )
+            response.raise_for_status()
+        except httpx.TimeoutException:
+            return unresolved_envelope(
+                citation=url,
+                detail=f"timeout fetching {_host(url)}",
+            )
+        except httpx.HTTPError as exc:
+            return unresolved_envelope(
+                citation=url,
+                detail=f"http error fetching {_host(url)}: {exc}",
+            )
         text = " ".join(response.text.split())
         if firewall_hits(text):
             text = text[:400]
@@ -65,18 +78,48 @@ class DuckDuckGoSearcher:
     """Generic search. Conflicting secondary numbers stay unresolved."""
 
     def search(self, human: HumanInput) -> list[InboundEnvelope]:
-        try:
-            import httpx
-        except ImportError as exc:
-            raise RuntimeError("httpx is required for live web search") from exc
         query = f"{human.brand_id} {human.task}"
-        response = httpx.get(
-            "https://api.duckduckgo.com/",
-            params={"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"},
-            timeout=20.0,
-        )
-        response.raise_for_status()
-        payload = response.json()
+        try:
+            response = httpx.get(
+                "https://api.duckduckgo.com/",
+                params={
+                    "q": query,
+                    "format": "json",
+                    "no_html": "1",
+                    "skip_disambig": "1",
+                },
+                timeout=retrieval_timeout(),
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except httpx.TimeoutException:
+            return [
+                unresolved_envelope(
+                    citation="web search",
+                    detail="timeout contacting DuckDuckGo",
+                )
+            ]
+        except httpx.HTTPError as exc:
+            return [
+                unresolved_envelope(
+                    citation="web search",
+                    detail=f"http error contacting DuckDuckGo: {exc}",
+                )
+            ]
+        except json.JSONDecodeError:
+            return [
+                unresolved_envelope(
+                    citation="web search",
+                    detail="malformed payload from DuckDuckGo",
+                )
+            ]
+        if not isinstance(payload, dict):
+            return [
+                unresolved_envelope(
+                    citation="web search",
+                    detail="malformed payload from DuckDuckGo",
+                )
+            ]
         envelopes: list[InboundEnvelope] = []
         abstract = (payload.get("AbstractText") or "").strip()
         abstract_url = payload.get("AbstractURL") or ""

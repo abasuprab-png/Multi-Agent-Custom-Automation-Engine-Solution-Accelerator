@@ -92,6 +92,31 @@ def test_stdlib_host_readiness_and_gi_ae_interrupt():
         assert page.status == 200
         assert "Human Strategic Lock" in html
         assert "Signing does not release Lexie" in html
+        assert "HMAC" in html
+        assert "Entra" in html
+
+        sign = HTTPConnection(host, port, timeout=5)
+        sign.request(
+            "POST",
+            "/lock/sign",
+            body=json.dumps(
+                {
+                    "session_id": payload["session_id"],
+                    "signed_by": "lead-a",
+                    "closed_decision_ids": [
+                        point["id"]
+                        for point in payload["handoff"]["open_decision_points"]
+                    ],
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        signed = json.loads(sign.getresponse().read())
+        sign.close()
+        assert "lock" in signed
+        assert signed["lock"]["signed_by"] == "lead-a"
+        assert signed["lock"]["diagnosis_digest"] == payload["diagnosis_digest"]
+        assert signed["lock"]["signature"] != "sig-lead-b"
     finally:
         server.shutdown()
         server.server_close()

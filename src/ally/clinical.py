@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
+import httpx
+
 from ally.contracts import HumanInput, InboundEnvelope
 from ally.enums import ClaimSource, EpistemicStatus, EstimandBasis
-from ally.retrieval import RetrievalQuery, StructuredRetriever, percents_in
+from ally.retrieval import (
+    RetrievalClosedError,
+    RetrievalQuery,
+    StructuredRetriever,
+    percents_in,
+    retrieval_timeout,
+    unresolved_envelope,
+)
 
 ENV_LIVE_RETRIEVAL = "ALLY_LIVE_RETRIEVAL"
 CTGOV_STUDY = "https://clinicaltrials.gov/api/v2/studies/{nct_id}"
@@ -34,13 +44,20 @@ def _estimand_from(text: str) -> EstimandBasis | None:
 
 
 def _get_json(url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
-    import httpx
-
-    response = httpx.get(url, params=params, timeout=30.0, follow_redirects=True)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        response = httpx.get(
+            url, params=params, timeout=retrieval_timeout(), follow_redirects=True
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except httpx.TimeoutException as exc:
+        raise RetrievalClosedError(f"timeout contacting {url}") from exc
+    except httpx.HTTPError as exc:
+        raise RetrievalClosedError(f"http error contacting {url}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise RetrievalClosedError(f"malformed payload from {url}") from exc
     if not isinstance(payload, dict):
-        raise ValueError(f"expected object from {url}")
+        raise RetrievalClosedError(f"malformed payload from {url}")
     return payload
 
 
@@ -66,29 +83,37 @@ class ClinicalTrialsGov:
     def fetch(self, query: RetrievalQuery) -> list[InboundEnvelope]:
         if not query.nct_id:
             return []
-        payload = _get_json(CTGOV_STUDY.format(nct_id=query.nct_id))
-        study = payload.get("protocolSection") or payload
-        results = payload.get("resultsSection") or {}
-        title = (
-            ((study.get("identificationModule") or {}).get("officialTitle"))
-            or ((study.get("identificationModule") or {}).get("briefTitle"))
-            or query.nct_id
-        )
-        outcomes = results.get("outcomeMeasuresModule") or {}
-        blobs = _walk(outcomes) or _walk((study.get("outcomesModule") or {}))
-        text_block = " ".join(blobs)[:1200] or title
-        estimand = _estimand_from(text_block)
-        anchors = sorted(percents_in(text_block))
-        return [
-            InboundEnvelope(
-                source=ClaimSource.WEB,
-                epistemic=EpistemicStatus.VERIFIED,
-                citation=f"ClinicalTrials.gov {query.nct_id}",
-                estimand=estimand,
-                numeric_anchors=anchors,
-                text=f"{title}. {text_block}"[:900],
+        citation = f"ClinicalTrials.gov {query.nct_id}"
+        try:
+            payload = _get_json(CTGOV_STUDY.format(nct_id=query.nct_id))
+            study = payload.get("protocolSection") or payload
+            if not isinstance(study, dict):
+                raise RetrievalClosedError("malformed ClinicalTrials.gov study")
+            results = payload.get("resultsSection") or {}
+            if results and not isinstance(results, dict):
+                raise RetrievalClosedError("malformed ClinicalTrials.gov results")
+            title = (
+                ((study.get("identificationModule") or {}).get("officialTitle"))
+                or ((study.get("identificationModule") or {}).get("briefTitle"))
+                or query.nct_id
             )
-        ]
+            outcomes = results.get("outcomeMeasuresModule") or {}
+            blobs = _walk(outcomes) or _walk((study.get("outcomesModule") or {}))
+            text_block = " ".join(blobs)[:1200] or title
+            estimand = _estimand_from(text_block)
+            anchors = sorted(percents_in(text_block))
+            return [
+                InboundEnvelope(
+                    source=ClaimSource.WEB,
+                    epistemic=EpistemicStatus.VERIFIED,
+                    citation=citation,
+                    estimand=estimand,
+                    numeric_anchors=anchors,
+                    text=f"{title}. {text_block}"[:900],
+                )
+            ]
+        except RetrievalClosedError as exc:
+            return [unresolved_envelope(citation=citation, detail=str(exc))]
 
 
 class OpenFdaLabel:
@@ -98,25 +123,41 @@ class OpenFdaLabel:
         brand = (query.brand_id or "").strip()
         if not brand:
             return []
-        payload = _get_json(
-            OPENFDA_LABEL,
-            params={"search": f'openfda.brand_name:"{brand}"', "limit": "1"},
-        )
-        results = payload.get("results") or []
-        if not results:
-            return []
-        label = results[0]
-        indications = " ".join(label.get("indications_and_usage") or [])
-        if not indications:
-            return []
-        return [
-            InboundEnvelope(
-                source=ClaimSource.WEB,
-                epistemic=EpistemicStatus.VERIFIED,
-                citation=f"openFDA label {brand}",
-                text=indications[:800],
+        citation = f"openFDA label {brand}"
+        try:
+            payload = _get_json(
+                OPENFDA_LABEL,
+                params={"search": f'openfda.brand_name:"{brand}"', "limit": "1"},
             )
-        ]
+            results = payload.get("results") or []
+            if not results:
+                return [
+                    unresolved_envelope(
+                        citation=citation,
+                        detail="openFDA returned no label payload",
+                    )
+                ]
+            label = results[0]
+            if not isinstance(label, dict):
+                raise RetrievalClosedError("malformed openFDA label")
+            indications = " ".join(label.get("indications_and_usage") or [])
+            if not indications:
+                return [
+                    unresolved_envelope(
+                        citation=citation,
+                        detail="openFDA label had no indications_and_usage",
+                    )
+                ]
+            return [
+                InboundEnvelope(
+                    source=ClaimSource.WEB,
+                    epistemic=EpistemicStatus.VERIFIED,
+                    citation=citation,
+                    text=indications[:800],
+                )
+            ]
+        except RetrievalClosedError as exc:
+            return [unresolved_envelope(citation=citation, detail=str(exc))]
 
 
 class PrimaryRegulatoryRetriever:
@@ -135,12 +176,22 @@ class PrimaryRegulatoryRetriever:
         found: list[InboundEnvelope] = []
         try:
             found.extend(self.trials.fetch(query))
-        except Exception:
-            found = found
+        except Exception as exc:
+            found.append(
+                unresolved_envelope(
+                    citation=f"ClinicalTrials.gov {query.nct_id or 'unknown'}",
+                    detail=f"timeout or malformed payload: {exc}",
+                )
+            )
         try:
             found.extend(self.labels.fetch(query))
-        except Exception:
-            found = found
+        except Exception as exc:
+            found.append(
+                unresolved_envelope(
+                    citation=f"openFDA {query.brand_id or 'unknown'}",
+                    detail=f"timeout or malformed payload: {exc}",
+                )
+            )
         return found
 
 

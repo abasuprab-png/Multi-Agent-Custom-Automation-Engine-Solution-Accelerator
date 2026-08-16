@@ -1,9 +1,9 @@
 """Foundry Invocations must stop at Human Strategic Lock and emit typed objects."""
 
-from ally.contracts import HumanStrategicLock
 from ally.enums import CritiqueCode, ExecutionAgent, Stage
 from ally.fixtures import gi_ae_contradiction_input, happy_path_input
 from ally.foundry import AllyInvokeRequest, InvokeOp, SessionStore, handle_invoke
+from ally.lock import signed_lock
 
 
 def test_start_stops_at_lock_interrupt_and_does_not_emit_agent_handoff():
@@ -51,10 +51,9 @@ def test_apply_lock_does_not_auto_enter_execution():
         AllyInvokeRequest(
             op=InvokeOp.APPLY_LOCK,
             session_id=started.session_id,
-            lock=HumanStrategicLock(
-                diagnosis_digest=started.handoff.diagnosis.digest(),
-                signed_by="lead-b",
-                signature="sig-lead-b",
+            lock=signed_lock(
+                started.handoff.diagnosis.digest(),
+                "lead-b",
                 closed_decision_ids=[
                     point.id for point in started.handoff.diagnosis.open_decision_points
                 ],
@@ -79,10 +78,9 @@ def test_signed_lock_then_enter_execution_emits_typed_agent_handoff():
         AllyInvokeRequest(
             op=InvokeOp.APPLY_LOCK,
             session_id=started.session_id,
-            lock=HumanStrategicLock(
-                diagnosis_digest=started.handoff.diagnosis.digest(),
-                signed_by="lead-b",
-                signature="sig-lead-b",
+            lock=signed_lock(
+                started.handoff.diagnosis.digest(),
+                "lead-b",
                 closed_decision_ids=[
                     point.id for point in started.handoff.diagnosis.open_decision_points
                 ],
@@ -102,7 +100,7 @@ def test_signed_lock_then_enter_execution_emits_typed_agent_handoff():
     assert released.stage is Stage.EXECUTION
     assert released.agent_handoff is not None
     assert released.agent_handoff.to_agent is ExecutionAgent.RCC
-    assert released.agent_handoff.lock.signature == "sig-lead-b"
+    assert released.agent_handoff.lock.signed_by == "lead-b"
     assert released.agent_handoff.from_agent == "ally"
 
 

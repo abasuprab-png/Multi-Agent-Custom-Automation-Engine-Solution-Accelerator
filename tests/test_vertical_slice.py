@@ -6,6 +6,7 @@ from ally.contracts import HumanStrategicLock
 from ally.enums import CritiqueCode, ExecutionAgent, Stage
 from ally.exceptions import LockGateError
 from ally.fixtures import gi_ae_contradiction_input, happy_path_input
+from ally.lock import signed_lock
 from ally.runtime import run_vertical_slice
 
 
@@ -48,21 +49,15 @@ def test_lock_cannot_skip_blocking_decisions_on_the_planted_case():
     session = run_vertical_slice(gi_ae_contradiction_input())
     with pytest.raises(LockGateError, match="blocking decision"):
         session.apply_lock(
-            HumanStrategicLock(
-                diagnosis_digest=session.diagnosis.digest(),
-                signed_by="lead-a",
-                signature="sig",
-                closed_decision_ids=[],
-            )
+            signed_lock(session.diagnosis.digest(), "lead-a", closed_decision_ids=[])
         )
 
 
 def test_human_can_close_planted_decisions_and_release_execution():
     session = run_vertical_slice(gi_ae_contradiction_input())
-    lock = HumanStrategicLock(
-        diagnosis_digest=session.diagnosis.digest(),
-        signed_by="lead-a",
-        signature="override-sig",
+    lock = signed_lock(
+        session.diagnosis.digest(),
+        "lead-a",
         closed_decision_ids=[
             point.id for point in session.diagnosis.open_decision_points
         ],

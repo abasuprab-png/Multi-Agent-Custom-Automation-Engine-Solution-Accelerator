@@ -39,12 +39,30 @@ Both stay `model_tier="frontier_reasoning"`. Do not downgrade reconciliation. De
 - Self-critique checklist (already a code gate; keep it).
 - Human handoff object (already an Invocations interrupt; keep it).
 - Delegation brief: downstream agents may not infer identity or facts beyond what is stated.
-- Lock UI that posts `HumanStrategicLock` bound to `diagnosis.digest()`.
-- Hosted-shaped Lexie and RCC handlers that accept only `AgentHandoff`.
+- Lock UI that posts `HumanStrategicLock` bound to `diagnosis.digest()` and verified as Entra OIDC or HMAC. Arbitrary `signed_by` / `signature` strings are illegal.
+- Hosted Lexie and RCC agents on `commsos-prod`. Both throw `RefusalError` unless invoked with a validated, signed `AgentHandoff`.
+
+## Architectural constraints (this slice)
+
+These are control-plane law, not prompt hope.
+
+### Durable Session Persistence
+
+Container `$HOME` storage drops state when Foundry scales to zero after the 15-minute idle window. `$HOME` is a cache, not the system of record.
+
+Session state and open-verification lists must be serialized to **external durable storage** — Cosmos DB primary, Azure Blob fallback — keyed to `diagnosis.digest()`. Lock status, open-verification items, and diagnosis digests must reload on a cold start without trusting the deprovisioned container disk.
+
+### Entra-Bound Signature Verification
+
+`HumanStrategicLock` must validate the caller’s **Entra ID OIDC token** (or an **HMAC signature bound to `diagnosis.digest()`**) rather than accepting an arbitrary `signed_by` string. Mismatched digests and spoofed signers throw `LockGateError`. The lock UI signs through the host; it does not post a free-text signature.
+
+### Fail-Closed Retrieval
+
+Network timeouts or malformed payloads from ClinicalTrials.gov, openFDA, or web search must **fail closed**. Tag the record `epistemic: unresolved`. Do not crash the container. Do not fail open (omit the miss, or treat silence as verified).
 
 ## Memory
 
-- Short-term: running diagnosis and open-verification persist across idle (`$HOME`).
+- Short-term: running diagnosis and open-verification persist in Cosmos (Blob fallback), keyed by `diagnosis.digest()`. `$HOME` is an ephemeral cache.
 - Long-term: correction-pattern store, partitioned by `client_id` / `brand_id`.
 - Per-lead notes are silent. They never override an honest disagreement.
 - Every lock that closes Ally's decision points records a correction category. The metric is that a category stops recurring, not that a transcript is memorized.
@@ -57,7 +75,10 @@ Lexie/RCC may call a cheaper model **only** when `ALLY_EXECUTION_ABLATION=1`. De
 
 - Pytest + GI-AE still die at the lock.
 - Unsigned execution still throws.
+- Mismatched lock digests and spoofed signers throw `LockGateError`.
+- Cold-start session reload restores lock status, open verification, and `diagnosis.digest()`.
 - Live or fixture primary retrieval supersedes estimand-less secondary percentages.
+- Live retrieval/search timeouts and malformed payloads land as `epistemic: unresolved`.
 - Lock UI can sign and still not auto-execute.
 - Lexie/RCC reject free text and unsigned diagnoses.
 - Competitive landscape is never baked into a prompt or fine-tune.

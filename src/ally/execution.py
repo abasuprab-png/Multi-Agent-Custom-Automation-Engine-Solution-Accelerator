@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 from ally.contracts import AgentHandoff
 from ally.enums import ExecutionAgent
 from ally.exceptions import LockGateError, RefusalError
+from ally.lock import verify_lock
 from ally.writer import review_draft
 
 ENV_ABLATION = "ALLY_EXECUTION_ABLATION"
@@ -44,6 +45,7 @@ def accept_handoff(payload: AgentHandoff | dict[str, Any] | str) -> ExecutionAcc
         raise LockGateError("Lexie/RCC cannot receive a diagnosis lacking a lock signature")
     if not handoff.lock.signature.strip() or not handoff.lock.signed_by.strip():
         raise LockGateError("Lexie/RCC cannot receive a diagnosis lacking a lock signature")
+    verify_lock(handoff.lock, handoff.lock.diagnosis_digest)
     findings = review_draft(" ".join(claim.text for claim in handoff.claims))
     return ExecutionAccept(
         accepted=True,

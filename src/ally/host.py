@@ -13,9 +13,11 @@ from urllib.parse import parse_qs, urlparse
 from ally.enums import ExecutionAgent
 from ally.exceptions import AllyError
 from ally.execution import _parse_handoff, accept_handoff, assert_agent
+from ally.execution_host import execution_agent_from_env, run_execution_host
 from ally.fixtures import gi_ae_contradiction_input, happy_path_input
 from ally.foundry import AllyInvokeRequest, SessionStore, handle_invoke
 from ally.foundry_project import DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT
+from ally.lock import issue_lock
 
 try:
     from azure.ai.agentserver.invocations import InvocationAgentServerHost
@@ -91,6 +93,31 @@ class AllyInvocationHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, body)
             return
+        if parsed.path == "/lock/sign":
+            try:
+                body = json.loads(raw.decode("utf-8") or "{}")
+                session_id = str(body.get("session_id") or "")
+                session = self.store.get(session_id)
+                if session is None:
+                    digest = str(body.get("diagnosis_digest") or "")
+                    session = self.store.get_by_digest(digest) if digest else None
+                if session is None:
+                    self._send_json(404, {"error_type": "SequenceLockError", "error": "unknown session"})
+                    return
+                lock = issue_lock(
+                    diagnosis_digest=session.diagnosis.digest(),
+                    signed_by=str(body.get("signed_by") or ""),
+                    closed_decision_ids=list(body.get("closed_decision_ids") or []),
+                    authorization=self.headers.get("Authorization"),
+                )
+            except (AllyError, ValueError, json.JSONDecodeError) as exc:
+                self._send_json(
+                    400,
+                    {"error_type": type(exc).__name__, "error": str(exc)},
+                )
+                return
+            self._send_json(200, {"lock": lock.model_dump(mode="json")})
+            return
         if parsed.path in {"/execution/lexie", "/execution/rcc"}:
             expected = (
                 ExecutionAgent.LEXIE
@@ -161,6 +188,10 @@ def use_foundry_adapter() -> bool:
 def run_host() -> None:
     """Default entrypoint. Adapter only inside a Foundry hosted sandbox."""
     logging.basicConfig(level=logging.INFO)
+    execution_agent = execution_agent_from_env()
+    if execution_agent is not None:
+        run_execution_host(execution_agent)
+        return
     if use_foundry_adapter():
         _run_foundry_adapter()
         return

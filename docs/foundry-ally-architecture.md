@@ -13,7 +13,7 @@ Ally remains a sequence-locked state machine with typed objects. Foundry is the 
 | Model | **Two** Direct-from-Azure GPT-5.6 deployments: `gpt-5.6-sol` thinks, `gpt-5.6-terra` does |
 | Passes | Discovery+Counsel at temperature `0.35` / generous thinking; Evidence Reconciliation at `0.0` / tight thinking |
 | Human Strategic Lock | Invocations **interrupt**. `apply_lock` is a second call. Never auto-execute. |
-| Lexie / RCC | Later Hosted agents that accept only `AgentHandoff` JSON. Not now. |
+| Lexie / RCC | Hosted Invocations agents on `commsos-prod`. Accept only a validated, signed `AgentHandoff`. Free text is `RefusalError`. |
 | Eval source of truth | Existing pytest + GI-AE fixture. Foundry observe/eval sits on top. |
 
 Prompt agents are rejected. Foundry's default Agent Framework / Magentic path is rejected. Connected-agents / A2A free-text handoffs are rejected.
@@ -76,7 +76,7 @@ Legal operations — there is no "chat" op:
 
 `apply_lock` does not enter execution. That is deliberate. The Human Strategic Lead signs; a separate, explicit call releases Lexie/RCC.
 
-Session routing: Foundry Invocations reads `agent_session_id` from the **query string** only ([manage hosted sessions](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/manage-hosted-sessions)). The body `session_id` is Ally's logical id. First deploy: set both to the same value. Persist `AllySession` under `$HOME` (restored after the 15-minute idle deprovision). Cosmos is later, when lock interrupts outlive sandbox files.
+Session routing: Foundry Invocations reads `agent_session_id` from the **query string** only ([manage hosted sessions](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/manage-hosted-sessions)). The body `session_id` is Ally's logical id. First deploy: set both to the same value. `$HOME` is an ephemeral cache and drops when Foundry scales to zero after the 15-minute idle window. Persist `AllySession` (lock status, open verification, diagnosis digest) to Cosmos DB, with Azure Blob fallback, keyed to `diagnosis.digest()`.
 
 Container contract ([hosted agent runtime contract](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/hosted-agent-contract)):
 

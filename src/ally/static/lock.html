@@ -91,9 +91,10 @@
     </section>
     <section>
       <h2>Sign the lock</h2>
+      <p class="badge">Server binds the caller to diagnosis.digest() with HMAC or an Entra OIDC Bearer. Arbitrary signature strings are rejected. Signing does not release Lexie or RCC.</p>
       <div class="row">
-        <input id="signed_by" placeholder="signed_by" value="lead-b" />
-        <input id="signature" placeholder="signature" value="sig-lead-b" />
+        <input id="signed_by" placeholder="Entra identity / signed_by" value="lead-b" />
+        <input id="entra_token" placeholder="optional Entra Bearer token" />
         <button id="lock" type="button" disabled>Apply lock</button>
         <button id="enter" type="button" class="secondary" disabled>Enter execution</button>
         <button id="lexie" type="button" class="secondary" disabled>Send to Lexie</button>
@@ -166,15 +167,29 @@
     };
     document.getElementById("lock").onclick = async () => {
       const ids = [...document.querySelectorAll(".od:checked")].map((el) => el.value);
+      const headers = { "Content-Type": "application/json" };
+      const bearer = document.getElementById("entra_token").value.trim();
+      if (bearer) headers["Authorization"] = bearer.startsWith("Bearer ") ? bearer : "Bearer " + bearer;
+      const signedRes = await fetch("/lock/sign", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          session_id: state.sessionId,
+          diagnosis_digest: state.digest,
+          signed_by: document.getElementById("signed_by").value,
+          closed_decision_ids: ids,
+        }),
+      });
+      const signed = await signedRes.json();
+      if (signed.error) {
+        document.getElementById("lockmsg").textContent = signed.error_type + ": " + signed.error;
+        document.getElementById("raw").textContent = JSON.stringify(signed, null, 2);
+        return;
+      }
       const payload = await post("/invocations", {
         op: "apply_lock",
         session_id: state.sessionId,
-        lock: {
-          diagnosis_digest: state.digest,
-          signed_by: document.getElementById("signed_by").value,
-          signature: document.getElementById("signature").value,
-          closed_decision_ids: ids,
-        },
+        lock: signed.lock,
       });
       render(payload);
       document.getElementById("lockmsg").textContent = payload.error

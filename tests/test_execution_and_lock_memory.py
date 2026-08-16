@@ -2,12 +2,12 @@
 
 import pytest
 
-from ally.contracts import HumanStrategicLock
 from ally.enums import CorrectionCategory, ExecutionAgent
 from ally.exceptions import RefusalError
 from ally.execution import accept_handoff
 from ally.fixtures import gi_ae_contradiction_input, happy_path_input
 from ally.foundry import AllyInvokeRequest, InvokeOp, SessionStore, handle_invoke
+from ally.lock import signed_lock
 from ally.memory import MemoryStore
 
 
@@ -27,10 +27,9 @@ def test_signed_handoff_is_accepted_by_lexie():
         AllyInvokeRequest(
             op=InvokeOp.APPLY_LOCK,
             session_id=started.session_id,
-            lock=HumanStrategicLock(
-                diagnosis_digest=started.handoff.diagnosis.digest(),
-                signed_by="lead-b",
-                signature="sig-lead-b",
+            lock=signed_lock(
+                started.handoff.diagnosis.digest(),
+                "lead-b",
                 closed_decision_ids=[
                     point.id for point in started.handoff.diagnosis.open_decision_points
                 ],
@@ -66,10 +65,9 @@ def test_lock_override_records_partitioned_corrections(tmp_path):
         AllyInvokeRequest(
             op=InvokeOp.APPLY_LOCK,
             session_id=started.session_id,
-            lock=HumanStrategicLock(
-                diagnosis_digest=started.handoff.diagnosis.digest(),
-                signed_by="lead-a",
-                signature="sig-override",
+            lock=signed_lock(
+                started.handoff.diagnosis.digest(),
+                "lead-a",
                 closed_decision_ids=[
                     point.id for point in started.handoff.open_decision_points
                 ],

@@ -3,10 +3,11 @@
 import pytest
 from pydantic import ValidationError
 
-from ally.contracts import AgentHandoff, HumanStrategicLock
+from ally.contracts import AgentHandoff
 from ally.enums import ExecutionAgent, Stage
 from ally.exceptions import LockGateError, SequenceLockError
 from ally.fixtures import happy_path_input
+from ally.lock import signed_lock
 from ally.runtime import assert_transition, next_stage, run_vertical_slice
 
 
@@ -61,10 +62,9 @@ def test_lexie_handoff_without_lock_is_rejected_by_object_model():
 
 def test_signed_lock_releases_execution():
     session = run_vertical_slice(happy_path_input())
-    lock = HumanStrategicLock(
-        diagnosis_digest=session.diagnosis.digest(),
-        signed_by="lead-b",
-        signature="sig-lead-b",
+    lock = signed_lock(
+        session.diagnosis.digest(),
+        "lead-b",
         closed_decision_ids=[
             point.id for point in session.diagnosis.open_decision_points
         ],
@@ -72,5 +72,6 @@ def test_signed_lock_releases_execution():
     session.apply_lock(lock)
     handoff = session.enter_execution(to_agent="lexie")
     assert session.stage is Stage.EXECUTION
-    assert handoff.lock.signature == "sig-lead-b"
+    assert handoff.lock.signed_by == "lead-b"
+    assert handoff.lock.signature == lock.signature
     assert handoff.to_agent is ExecutionAgent.LEXIE

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Protocol
 
@@ -11,6 +12,12 @@ from ally.contracts import Claim, InboundEnvelope, QuarantineRecord
 from ally.enums import ClaimSource, EpistemicStatus, EstimandBasis, QuarantineReason
 
 _PERCENT = re.compile(r"\b\d+(?:\.\d+)?\s*%")
+ENV_RETRIEVAL_TIMEOUT = "ALLY_RETRIEVAL_TIMEOUT"
+DEFAULT_RETRIEVAL_TIMEOUT = 8.0
+
+
+class RetrievalClosedError(Exception):
+    """Timeout or malformed live retrieval. Callers must fail closed."""
 
 
 class RetrievalQuery(BaseModel):
@@ -22,6 +29,26 @@ class RetrievalQuery(BaseModel):
 class StructuredRetriever(Protocol):
     def fetch(self, query: RetrievalQuery) -> list[InboundEnvelope]:
         """Return already-tagged primary envelopes. Never untagged paraphrase."""
+
+
+def retrieval_timeout() -> float:
+    raw = os.environ.get(ENV_RETRIEVAL_TIMEOUT, "").strip()
+    if not raw:
+        return DEFAULT_RETRIEVAL_TIMEOUT
+    try:
+        return max(0.1, float(raw))
+    except ValueError:
+        return DEFAULT_RETRIEVAL_TIMEOUT
+
+
+def unresolved_envelope(*, citation: str, detail: str) -> InboundEnvelope:
+    """Fail closed: missing live data is unresolved, not verified and not a crash."""
+    return InboundEnvelope(
+        source=ClaimSource.WEB,
+        epistemic=EpistemicStatus.UNRESOLVED,
+        citation=citation,
+        text=f"epistemic: unresolved — {detail}",
+    )
 
 
 def percents_in(text: str, anchors: list[str] | None = None) -> set[str]:

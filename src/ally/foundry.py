@@ -18,6 +18,7 @@ from ally.contracts import (
     HumanStrategicLock,
     QuarantineRecord,
 )
+from ally.durable import DurableBackend, DurableWriteError, durable_from_env
 from ally.enums import ExecutionAgent, Stage
 from ally.exceptions import AllyError
 from ally.memory import MemoryStore
@@ -41,6 +42,7 @@ class AllyInvokeRequest(BaseModel):
     human: HumanInput | None = None
     lock: HumanStrategicLock | None = None
     to_agent: ExecutionAgent = ExecutionAgent.LEXIE
+    diagnosis_digest: str | None = None
 
 
 class AllyInvokeResponse(BaseModel):
@@ -102,16 +104,18 @@ class SessionSnapshot(BaseModel):
 
 
 class SessionStore:
-    """In-process session map with optional $HOME persistence."""
+    """In-process map plus $HOME cache and external durable storage."""
 
     def __init__(
         self,
         persist_dir: Path | str | None = None,
         memory: MemoryStore | None = None,
+        durable: DurableBackend | None = None,
     ) -> None:
         self._sessions: dict[str, AllySession] = {}
         self.memory = memory or MemoryStore()
         self._persist_dir = Path(persist_dir) if persist_dir is not None else None
+        self._durable = durable
         if self._persist_dir is not None:
             self._persist_dir.mkdir(parents=True, exist_ok=True)
 
@@ -121,12 +125,14 @@ class SessionStore:
         return cls(
             persist_dir=home / "ally-sessions",
             memory=MemoryStore.under_home(),
+            durable=durable_from_env(),
         )
 
     def put(self, session: AllySession) -> AllySession:
         session.memory = self.memory
         self._sessions[session.session_id] = session
         self._write(session)
+        self._write_durable(session)
         return session
 
     def get(self, session_id: str) -> AllySession | None:
@@ -134,8 +140,36 @@ class SessionStore:
         if cached is not None:
             return cached
         loaded = self._read(session_id)
+        if loaded is None:
+            loaded = self._read_durable_session(session_id)
         if loaded is not None:
             self._sessions[session_id] = loaded
+        return loaded
+
+    def get_by_digest(self, digest: str) -> AllySession | None:
+        for session in self._sessions.values():
+            if session.diagnosis.digest() == digest:
+                return session
+        if self._persist_dir is not None:
+            for path in self._persist_dir.glob("*.json"):
+                try:
+                    loaded = self._session_from_json(path.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                if loaded is not None and loaded.diagnosis.digest() == digest:
+                    self._sessions[loaded.session_id] = loaded
+                    return loaded
+        if self._durable is None:
+            return None
+        try:
+            raw = self._durable.get_json_by_digest(digest)
+        except Exception:
+            return None
+        if raw is None:
+            return None
+        loaded = self._session_from_json(raw)
+        if loaded is not None:
+            self._sessions[loaded.session_id] = loaded
         return loaded
 
     def _path(self, session_id: str) -> Path | None:
@@ -156,7 +190,34 @@ class SessionStore:
         path = self._path(session_id)
         if path is None or not path.is_file():
             return None
-        snapshot = SessionSnapshot.model_validate_json(path.read_text(encoding="utf-8"))
+        return self._session_from_json(path.read_text(encoding="utf-8"))
+
+    def _write_durable(self, session: AllySession) -> None:
+        if self._durable is None:
+            return
+        snapshot = SessionSnapshot.from_session(session)
+        try:
+            self._durable.put_json(
+                session_id=session.session_id,
+                digest=session.diagnosis.digest(),
+                payload=snapshot.model_dump_json(),
+            )
+        except DurableWriteError:
+            return
+
+    def _read_durable_session(self, session_id: str) -> AllySession | None:
+        if self._durable is None:
+            return None
+        try:
+            raw = self._durable.get_json_by_session_id(session_id)
+        except Exception:
+            return None
+        if raw is None:
+            return None
+        return self._session_from_json(raw)
+
+    def _session_from_json(self, raw: str) -> AllySession | None:
+        snapshot = SessionSnapshot.model_validate_json(raw)
         session = snapshot.to_session()
         session.memory = self.memory
         return session
@@ -206,7 +267,7 @@ def _start(
 
 
 def _apply_lock(request: AllyInvokeRequest, store: SessionStore) -> AllyInvokeResponse:
-    session = _load_session(request.session_id, store)
+    session = _load_session(request.session_id, store, request.diagnosis_digest)
     if isinstance(session, AllyInvokeResponse):
         return session
     if request.lock is None:
@@ -236,7 +297,7 @@ def _apply_lock(request: AllyInvokeRequest, store: SessionStore) -> AllyInvokeRe
 def _enter_execution(
     request: AllyInvokeRequest, store: SessionStore
 ) -> AllyInvokeResponse:
-    session = _load_session(request.session_id, store)
+    session = _load_session(request.session_id, store, request.diagnosis_digest)
     if isinstance(session, AllyInvokeResponse):
         return session
     try:
@@ -254,21 +315,29 @@ def _enter_execution(
 
 
 def _load_session(
-    session_id: str | None, store: SessionStore
+    session_id: str | None,
+    store: SessionStore,
+    diagnosis_digest: str | None = None,
 ) -> AllySession | AllyInvokeResponse:
-    if not session_id:
+    if session_id:
+        session = store.get(session_id)
+        if session is not None:
+            return session
+    if diagnosis_digest:
+        session = store.get_by_digest(diagnosis_digest)
+        if session is not None:
+            return session
+    if not session_id and not diagnosis_digest:
         return AllyInvokeResponse(
             error_type="SequenceLockError",
-            error="session_id is required after start",
+            error="session_id or diagnosis_digest is required after start",
         )
-    session = store.get(session_id)
-    if session is None:
-        return AllyInvokeResponse(
-            session_id=session_id,
-            error_type="SequenceLockError",
-            error=f"unknown session_id {session_id}",
-        )
-    return session
+    return AllyInvokeResponse(
+        session_id=session_id,
+        error_type="SequenceLockError",
+        error=f"unknown session_id {session_id}",
+        diagnosis_digest=diagnosis_digest,
+    )
 
 
 def _error(

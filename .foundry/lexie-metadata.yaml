@@ -1,0 +1,19 @@
+defaultEnvironment: prod
+environments:
+  prod:
+    projectEndpoint: https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod
+    agentName: lexie
+    azureContainerRegistry: allyruntimeeus2.azurecr.io
+    image: allyruntimeeus2.azurecr.io/lexie:pending
+    cpu: "0.5"
+    memory: 1Gi
+    protocols:
+      - protocol: invocations
+        version: 2.0.0
+    environmentVariables:
+      ALLY_AGENT: lexie
+    evaluationSuites: []
+    contract:
+      accepts: AgentHandoff
+      unsigned: LockGateError
+      freeText: RefusalError
