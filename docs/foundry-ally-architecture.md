@@ -180,10 +180,10 @@ First hosted deploy may keep the current deterministic slice (no live LLM). That
 | Resource | Value |
 | --- | --- |
 | Subscription | `85d4d146-1694-46a2-9830-43ec9f2c5ba2` |
-| Resource group | `sfg-commsos-prod` |
-| Foundry account | `commsos-foundry-hub` |
-| Project | `CommsOS-Core` |
-| Endpoint | `https://commsos-foundry-hub.services.ai.azure.com/api/projects/CommsOS-Core` |
+| Resource group | `rg-rag-prototype` |
+| Foundry account | `commsos-prod-resource` |
+| Project | `commsos-prod` |
+| Endpoint | `https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod` |
 | Hosted agent | `ally` (Invocations 2.0.0) |
 | First-deploy model | **None.** Deterministic slice. No inference credits. |
 

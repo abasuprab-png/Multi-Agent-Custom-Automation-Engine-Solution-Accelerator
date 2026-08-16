@@ -7,7 +7,23 @@ from pathlib import Path
 
 from ally.fixtures import gi_ae_contradiction_input
 from ally.foundry import AllyInvokeRequest, InvokeOp, SessionStore, handle_invoke
+from ally.foundry_project import (
+    ACCOUNT_NAME,
+    PROJECT_ENDPOINT,
+    PROJECT_NAME,
+    PROJECT_RESOURCE_ID,
+    RESOURCE_GROUP,
+)
 from ally.host import serve_stdlib
+
+
+def test_host_targets_commsos_prod_not_a_second_account():
+    assert ACCOUNT_NAME == "commsos-prod-resource"
+    assert PROJECT_NAME == "commsos-prod"
+    assert RESOURCE_GROUP == "rg-rag-prototype"
+    assert PROJECT_ENDPOINT.endswith("/api/projects/commsos-prod")
+    assert "commsos-prod-resource" in PROJECT_RESOURCE_ID
+    assert "CommsOS-Core" not in PROJECT_RESOURCE_ID
 
 
 def test_session_survives_new_store_on_disk(tmp_path: Path):

@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
-# Deploys Hosted agent `ally` onto the existing CommsOS-Core Foundry project.
+# Deploys Hosted agent `ally` onto the existing commsos-prod Foundry project.
 # Do not add a second Foundry account, Magentic graph, or prompt agent.
 
 requiredVersions:

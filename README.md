@@ -28,10 +28,10 @@ Microsoft Foundry hosts **one** Invocations agent that calls `handle_invoke`. It
 Target project (already exists — do not create a second account):
 
 - Subscription `85d4d146-1694-46a2-9830-43ec9f2c5ba2`
-- Resource group `sfg-commsos-prod`
-- Account `commsos-foundry-hub`
-- Project `CommsOS-Core`
-- Endpoint `https://commsos-foundry-hub.services.ai.azure.com/api/projects/CommsOS-Core`
+- Resource group `rg-rag-prototype`
+- Account `commsos-prod-resource`
+- Project `commsos-prod`
+- Endpoint `https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod`
 
 Local host (no Azure credentials, no model):
 
@@ -47,7 +47,7 @@ Deploy to the existing project (after Azure login):
 
 ```bash
 azd env set AZURE_SUBSCRIPTION_ID 85d4d146-1694-46a2-9830-43ec9f2c5ba2
-azd env set AZURE_AI_PROJECT_ENDPOINT https://commsos-foundry-hub.services.ai.azure.com/api/projects/CommsOS-Core
+azd env set AZURE_AI_PROJECT_ENDPOINT https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod
 azd ai agent deploy
 ```
 
