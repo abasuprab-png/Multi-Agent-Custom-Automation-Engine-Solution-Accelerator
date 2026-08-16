@@ -126,10 +126,8 @@
     function render(payload) {
       state.sessionId = payload.session_id;
       state.handoff = payload.handoff;
-      const dx = payload.handoff && payload.handoff.diagnosis;
-      state.digest = dx ? dx.digest || null : null;
-      if (dx && !state.digest) {
-        state.digest = payload.handoff.diagnosis_digest || null;
+      if (payload.diagnosis_digest) {
+        state.digest = payload.diagnosis_digest;
       }
       document.getElementById("status").textContent =
         "session " + (payload.session_id || "none") +
@@ -164,11 +162,6 @@
     document.getElementById("start").onclick = async () => {
       if (!state.human) await loadFixture("gi-ae");
       const payload = await post("/invocations", { op: "start", human: state.human });
-      if (payload.handoff && payload.handoff.diagnosis) {
-        const digestRes = await fetch("/digest/" + payload.session_id);
-        const digestBody = await digestRes.json();
-        state.digest = digestBody.digest;
-      }
       render(payload);
     };
     document.getElementById("lock").onclick = async () => {

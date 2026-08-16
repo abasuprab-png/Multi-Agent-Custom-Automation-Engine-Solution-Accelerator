@@ -53,6 +53,7 @@ class AllyInvokeResponse(BaseModel):
     agent_handoff: AgentHandoff | None = None
     error_type: str | None = None
     error: str | None = None
+    diagnosis_digest: str | None = None
 
 
 class SessionSnapshot(BaseModel):
@@ -200,6 +201,7 @@ def _start(
         stage=session.stage,
         interrupt=True,
         handoff=session.handoff,
+        diagnosis_digest=session.diagnosis.digest(),
     )
 
 
@@ -215,6 +217,7 @@ def _apply_lock(request: AllyInvokeRequest, store: SessionStore) -> AllyInvokeRe
             handoff=session.handoff,
             error_type="LockGateError",
             error="apply_lock requires a HumanStrategicLock object",
+            diagnosis_digest=session.diagnosis.digest(),
         )
     try:
         session.apply_lock(request.lock)
@@ -226,6 +229,7 @@ def _apply_lock(request: AllyInvokeRequest, store: SessionStore) -> AllyInvokeRe
         stage=session.stage,
         interrupt=False,
         handoff=session.handoff,
+        diagnosis_digest=session.diagnosis.digest(),
     )
 
 
@@ -245,6 +249,7 @@ def _enter_execution(
         stage=session.stage,
         interrupt=False,
         agent_handoff=handoff,
+        diagnosis_digest=session.diagnosis.digest(),
     )
 
 
@@ -276,6 +281,7 @@ def _error(
         handoff=session.handoff,
         error_type=type(exc).__name__,
         error=str(exc),
+        diagnosis_digest=session.diagnosis.digest(),
     )
 
 

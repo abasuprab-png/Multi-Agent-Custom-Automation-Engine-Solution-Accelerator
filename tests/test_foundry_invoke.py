@@ -17,6 +17,7 @@ def test_start_stops_at_lock_interrupt_and_does_not_emit_agent_handoff():
     assert response.stage is Stage.HUMAN_STRATEGIC_LOCK
     assert response.handoff is not None
     assert response.agent_handoff is None
+    assert response.diagnosis_digest == response.handoff.diagnosis.digest()
     codes = {issue.code for issue in response.handoff.critique.issues}
     assert CritiqueCode.CROSS_CLAIM in codes
     assert CritiqueCode.ADMISSIBILITY_CATALYST in codes
