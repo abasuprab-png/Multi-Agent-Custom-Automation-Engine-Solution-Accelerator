@@ -1,0 +1,8 @@
+defaultEnvironment: prod
+environments:
+  prod:
+    projectEndpoint: https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod
+    agentName: ally
+    azureContainerRegistry: allyruntimeeus2.azurecr.io
+    image: allyruntimeeus2.azurecr.io/ally:202608161007
+    evaluationSuites: []
