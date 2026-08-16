@@ -21,6 +21,10 @@ Ally is two internal passes, not two agents: Discovery+Counsel (temp 0.3–0.4) 
 
 This slice does **not** call a live model, CAMS, or Lexie/RCC. Structured retrieval is a port (`StructuredRetriever`); the ClinicalTrials.gov fixture is what resolves REDEFINE-style estimand confusion. Identity inference is read from prose. Cross-claim rules live in a registry. The GI-AE fixture remains the eval for unsigned execution.
 
+## Foundry (host, not control plane)
+
+Microsoft Foundry hosts **one** Invocations agent that calls `handle_invoke`. It does not become a prompt agent, Magentic graph, or second Ally. Human Strategic Lock is an interrupt: `start` returns `HumanHandoff`; `enter_execution` is unreachable until `apply_lock`. See [docs/foundry-ally-architecture.md](docs/foundry-ally-architecture.md).
+
 ## Run
 
 ```bash

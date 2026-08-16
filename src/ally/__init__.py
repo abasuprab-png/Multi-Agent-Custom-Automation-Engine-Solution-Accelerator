@@ -27,6 +27,13 @@ from ally.exceptions import LockGateError, RefusalError, SequenceLockError
 from ally.memory import MemoryStore
 from ally.prompts import SYSTEM_PROMPT
 from ally.retrieval import ClinicalTrialsFixture, RetrievalQuery
+from ally.foundry import (
+    AllyInvokeRequest,
+    AllyInvokeResponse,
+    InvokeOp,
+    SessionStore,
+    handle_invoke,
+)
 from ally.runtime import AllySession, assert_transition, run_vertical_slice
 
 __all__ = [
@@ -49,6 +56,11 @@ __all__ = [
     "HumanInput",
     "HumanStrategicLock",
     "InboundEnvelope",
+    "InvokeOp",
+    "AllyInvokeRequest",
+    "AllyInvokeResponse",
+    "SessionStore",
+    "handle_invoke",
     "LockGateError",
     "MemoryStore",
     "RefusalError",
