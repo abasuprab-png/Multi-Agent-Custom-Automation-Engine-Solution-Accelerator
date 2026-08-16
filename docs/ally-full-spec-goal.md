@@ -4,7 +4,9 @@ This is the statement to work against. It is the original spec, not the first-de
 
 ## Goal
 
-Build Ally as a sequence-locked state machine with typed objects. Foundry is the host, the model bill, and the observe plane. Do not start from Magentic. Do not add a second Ally agent. Do not use Claude or any Marketplace model.
+Build Ally as the chief communications officer for pharmaceutical and biotech brands — design center: Lilly running global GLP-1 communications. The product is still a sequence-locked state machine with typed objects. Foundry is the host, the model bill, and the observe plane. Do not start from Magentic. Do not add a second Ally agent. Do not use Claude or any Marketplace model.
+
+Ally's job is the **strategic insight**: the unmet need the product actually addresses, aligned with white space in the minds of the primary influencers who mediate the trust dynamics that lead to a prescribed, covered, chosen therapy. Consumer demand is a condition of this market. It does not replace those mediators. Competitive landscape is live retrieval only — never baked into a prompt or fine-tune. "Better than anyone" without evidenced comparison is not an insight.
 
 Ally is **one** Hosted agent (`ally`) on existing `commsos-prod`, **Invocations only**. Ally is **two internal passes**, not two agents:
 
@@ -27,6 +29,7 @@ Both stay `model_tier="frontier_reasoning"`. Do not downgrade reconciliation. De
 8. Refusal is designed: missing client/brand/lead/task refuses. Lazy answers are push-back, not completion.
 9. Human Strategic Lock is a hard gate. `apply_lock` does not auto-execute. Unsigned `enter_execution` throws `LockGateError`. Lexie/RCC cannot receive a diagnosis lacking a lock signature.
 10. Every inter-agent handoff is a structured object with explicit `unresolved[]` and `inferred[]`. Free text is illegal.
+11. A diagnosis without a `StrategicInsight` (SI-1 through SI-5) is incomplete CCO counsel. Missing unmet need, distinctive solve, influencer white space, or trust dynamic is a critique issue, not a slogan.
 
 ## Required tools (code, not prompt hope)
 
@@ -73,6 +76,8 @@ Lexie/RCC may call a cheaper model **only** when `ALLY_EXECUTION_ABLATION=1`. De
 
 ## Eval — a slice is not done until
 
+- A Lilly GLP-1 CCO fixture can carry a complete insight and still die at the lock.
+- Consumer-only influencers and unevidenced "better than anyone" fail SI-4 / SI-2.
 - Pytest + GI-AE still die at the lock.
 - Unsigned execution still throws.
 - Mismatched lock digests and spoofed signers throw `LockGateError`.

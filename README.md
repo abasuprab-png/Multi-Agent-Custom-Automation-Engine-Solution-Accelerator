@@ -1,6 +1,6 @@
 # Ally runtime
 
-Typed multi-agent runtime for strategic counsel. Magentic-style prompt routing is not the control plane. Every section exists to force one of five behaviors:
+Typed multi-agent runtime for pharmaceutical and biotech CCO counsel. Magentic-style prompt routing is not the control plane. Ally's job is the strategic insight — unmet need, distinctive solve, influencer white space, trust dynamic — then a Human Strategic Lock. Every section exists to force one of five behaviors:
 
 1. **Outside-in verification** — human, web, and agent claims take the same `verified` / `inferred` / `unresolved` tag. Untagged input is quarantined.
 2. **Doctrine as an executable filter** — Admissibility is a checklist against citable Canon rules ADM-1 and ADM-2. Unanswered is a no.

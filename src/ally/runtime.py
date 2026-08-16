@@ -13,6 +13,7 @@ from ally.contracts import (
     HumanStrategicLock,
     OpenDecisionPoint,
     QuarantineRecord,
+    StrategicInsight,
 )
 from ally.critique import run_self_critique
 from ally.enums import (
@@ -26,6 +27,7 @@ from ally.enums import (
 )
 from ally.exceptions import LockGateError, SequenceLockError
 from ally.lock import verify_lock
+from ally.insight import insight_from_notes
 from ally.ingest import ingest_envelopes, inferred_texts, unresolved_texts
 from ally.cams import CamsReader
 from ally.clinical import retriever_from_env
@@ -116,6 +118,7 @@ class AllySession:
             unresolved=unresolved_texts(self.diagnosis.claims)
             + [item.label for item in self.diagnosis.unresolved_verification()],
             inferred=inferred_texts(self.diagnosis.claims),
+            insight=self.diagnosis.insight,
             lock=lock,
         )
 
@@ -197,8 +200,14 @@ def run_vertical_slice(
         task=human.task,
         claims=claims,
         spine_candidates=spines,
+        insight=_assemble_insight(human, counsel),
         open_verification=list(human.open_verification),
-        canon_citations=[rule.id for rule in query_canon("ADM-1", "ADM-2")],
+        canon_citations=[
+            rule.id
+            for rule in query_canon(
+                "ADM-1", "ADM-2", "SI-1", "SI-2", "SI-3", "SI-4", "SI-5"
+            )
+        ],
         pass_history=[counsel_record, recon_record],
         counsel_notes=counsel.notes if counsel is not None else None,
         reconciliation_notes=recon.notes if recon is not None else None,
@@ -260,6 +269,14 @@ def _hold_inferred_contradictions(
         else:
             kept.append(claim)
     return diagnosis.model_copy(update={"claims": kept}), held
+
+
+def _assemble_insight(human: HumanInput, counsel: object | None) -> StrategicInsight | None:
+    if human.insight is not None:
+        return human.insight
+    if counsel is None:
+        return None
+    return insight_from_notes(counsel)
 
 
 def _decisions(

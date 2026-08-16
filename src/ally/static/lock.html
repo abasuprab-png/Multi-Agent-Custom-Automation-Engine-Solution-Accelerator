@@ -68,15 +68,20 @@
 <body>
   <header>
     <h1>Human Strategic Lock</h1>
-    <p>Typed interrupt. Signing does not release Lexie or RCC. Execution is a second call.</p>
+    <p>Ally is CCO counsel for pharma/biotech. Signing does not release Lexie or RCC. Execution is a second call.</p>
   </header>
   <main>
     <div class="row">
       <button id="giae" type="button">Load GI-AE fixture</button>
       <button id="happy" type="button" class="secondary">Load happy path</button>
+      <button id="lilly" type="button" class="secondary">Load Lilly GLP-1 CCO</button>
       <button id="start" type="button">Start diagnosis</button>
     </div>
     <p class="badge" id="status">No session.</p>
+    <section>
+      <h2>Strategic insight</h2>
+      <div id="insight"><p class="badge">Start a diagnosis first.</p></div>
+    </section>
     <section>
       <h2>Open decision points</h2>
       <div id="decisions"><p class="badge">Start a diagnosis first.</p></div>
@@ -144,6 +149,18 @@
           "<span>" + p.prompt + "</span></label>"
         )).join("");
       }
+      const insight = payload.handoff && payload.handoff.diagnosis && payload.handoff.diagnosis.insight;
+      const insightBox = document.getElementById("insight");
+      if (!insight) {
+        insightBox.innerHTML = "<p class='bad'>No strategic insight. Ally will not treat a slogan as CCO counsel.</p>";
+      } else {
+        insightBox.innerHTML =
+          "<p><strong>Unmet need.</strong> " + insight.unmet_need + "</p>" +
+          "<p><strong>Distinctive solve.</strong> " + insight.distinctive_solve + "</p>" +
+          "<p><strong>White space.</strong> " + insight.white_space + "</p>" +
+          "<p><strong>Influencers.</strong> " + (insight.primary_influencers || []).join("; ") + "</p>" +
+          "<p><strong>Trust dynamic.</strong> " + insight.trust_dynamic + "</p>";
+      }
       const issues = (payload.handoff && payload.handoff.critique && payload.handoff.critique.issues) || [];
       document.getElementById("critique").innerHTML = issues.length
         ? issues.map((i) => "<li class='bad'>" + i.code + " — " + i.message + "</li>").join("")
@@ -160,6 +177,7 @@
 
     document.getElementById("giae").onclick = () => loadFixture("gi-ae");
     document.getElementById("happy").onclick = () => loadFixture("happy");
+    document.getElementById("lilly").onclick = () => loadFixture("lilly-glp1");
     document.getElementById("start").onclick = async () => {
       if (!state.human) await loadFixture("gi-ae");
       const payload = await post("/invocations", { op: "start", human: state.human });

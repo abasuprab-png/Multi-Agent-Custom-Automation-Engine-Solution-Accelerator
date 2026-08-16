@@ -11,6 +11,7 @@ from ally.contracts import (
     HumanInput,
     HumanStrategicLock,
     InboundEnvelope,
+    StrategicInsight,
 )
 from ally.enums import (
     AllyPass,
@@ -59,6 +60,7 @@ __all__ = [
     "HumanInput",
     "HumanStrategicLock",
     "InboundEnvelope",
+    "StrategicInsight",
     "InvokeOp",
     "AllyInvokeRequest",
     "AllyInvokeResponse",

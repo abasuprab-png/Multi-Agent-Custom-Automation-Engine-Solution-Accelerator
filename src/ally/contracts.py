@@ -190,6 +190,20 @@ class CritiqueReport(BaseModel):
         return not self.issues
 
 
+class StrategicInsight(BaseModel):
+    """CCO-grade insight. Unmet need × distinctive solve × influencer white space."""
+
+    unmet_need: str = ""
+    distinctive_solve: str = ""
+    white_space: str = ""
+    primary_influencers: list[str] = Field(default_factory=list)
+    trust_dynamic: str = ""
+    consumer_pressure: str | None = None
+    comparative_evidenced: ChecklistAnswer = ChecklistAnswer.UNANSWERED
+    epistemic: EpistemicStatus = EpistemicStatus.INFERRED
+    evidence_claim_ids: list[str] = Field(default_factory=list)
+
+
 class AllyStrategicDiagnosis(BaseModel):
     id: str = Field(default_factory=lambda: _new_id("dx"))
     client_id: str
@@ -198,6 +212,7 @@ class AllyStrategicDiagnosis(BaseModel):
     task: str
     claims: list[Claim] = Field(default_factory=list)
     spine_candidates: list[AllyMessageSpineCandidate] = Field(default_factory=list)
+    insight: StrategicInsight | None = None
     open_verification: list[OpenVerificationItem] = Field(default_factory=list)
     open_decision_points: list[OpenDecisionPoint] = Field(default_factory=list)
     canon_citations: list[str] = Field(default_factory=list)
@@ -265,6 +280,7 @@ class AgentHandoff(BaseModel):
     claims: list[Claim]
     unresolved: list[str] = Field(default_factory=list)
     inferred: list[str] = Field(default_factory=list)
+    insight: StrategicInsight | None = None
     lock: HumanStrategicLock
 
 
@@ -276,6 +292,7 @@ class HumanInput(BaseModel):
     envelopes: list[InboundEnvelope] = Field(default_factory=list)
     open_verification: list[OpenVerificationItem] = Field(default_factory=list)
     spine: AllyMessageSpineCandidate | None = None
+    insight: StrategicInsight | None = None
     nct_id: str | None = None
 
     @field_validator("client_id", "brand_id", "lead_id", "task")

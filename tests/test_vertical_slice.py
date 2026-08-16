@@ -22,6 +22,7 @@ def test_planted_draft_hits_all_five_forces():
     assert CritiqueCode.GENRE in codes
     assert CritiqueCode.ESTIMAND in codes
     assert CritiqueCode.INTENSIFIER in codes
+    assert CritiqueCode.STRATEGIC_INSIGHT in codes
 
     assert session.quarantine
     assert any(

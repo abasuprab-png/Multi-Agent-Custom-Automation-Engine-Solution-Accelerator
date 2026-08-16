@@ -5,6 +5,7 @@ from ally.contracts import (
     HumanInput,
     InboundEnvelope,
     OpenVerificationItem,
+    StrategicInsight,
 )
 from ally.enums import (
     ChecklistAnswer,
@@ -138,6 +139,115 @@ def happy_path_input() -> HumanInput:
                 text=(
                     "Payer committees are already treating GI discontinuation as the "
                     "class-level access hurdle."
+                ),
+            ),
+        ],
+        insight=StrategicInsight(
+            unmet_need=(
+                "People who start a GLP-1 often cannot stay on it or get it covered, "
+                "so the clinical need is durable, tolerable, accessible obesity treatment."
+            ),
+            distinctive_solve=(
+                "Treatment-policy estimand: mean body-weight reduction was 16.2% "
+                "with exampletide versus 2.4% with placebo."
+            ),
+            white_space=(
+                "Payer and specialist minds still treat GI discontinuation as an "
+                "unsolved class hurdle rather than a product-specific persistence story."
+            ),
+            primary_influencers=[
+                "obesity-medicine specialists",
+                "PBM formulary committees",
+                "endocrinologists",
+            ],
+            trust_dynamic=(
+                "Specialists and PBMs mediate whether consumer demand becomes a "
+                "prescribed, covered therapy."
+            ),
+            consumer_pressure=(
+                "Consumers are initiating GLP-1 demand; that does not replace HCP/payer trust."
+            ),
+            comparative_evidenced=ChecklistAnswer.NO,
+            epistemic=EpistemicStatus.VERIFIED,
+        ),
+    )
+
+
+def lilly_glp1_cco_input() -> HumanInput:
+    """Design-center case: CCO counsel for global GLP-1 communications.
+
+    Competitive rank is not supplied. Insight is method, not landscape.
+    """
+    return HumanInput(
+        client_id="lilly",
+        brand_id="tirzepatide",
+        lead_id="cco-glp1",
+        task="Global GLP-1 strategic communications counsel",
+        spine=AllyMessageSpineCandidate(
+            genre=Genre.STRATEGIC_COUNSEL,
+            lede=(
+                "Counsel: occupy the persistence-and-access white space with dual-incretin "
+                "evidence. Do not lead with class-rank rhetoric."
+            ),
+        ),
+        insight=StrategicInsight(
+            unmet_need=(
+                "People seeking obesity care can now demand a GLP-1, but many cannot "
+                "get a durable, covered, tolerable regimen they will stay on."
+            ),
+            distinctive_solve=(
+                "Dual GIP/GLP-1 agonism is the evidenced mechanism to take to "
+                "specialists and payers as a persistence-and-control story, not a slogan."
+            ),
+            white_space=(
+                "Primary influencers still collapse the category to 'the GLP-1' and have "
+                "not occupied persistence, coverage, and dual-incretin distinction as "
+                "the trust problem."
+            ),
+            primary_influencers=[
+                "endocrinologists",
+                "obesity-medicine KOLs",
+                "PBM formulary committees",
+                "patient advocacy",
+            ],
+            trust_dynamic=(
+                "HCPs and PBMs mediate whether consumer-initiated demand becomes a "
+                "prescribed, covered, continued therapy. Advocacy shapes the trust "
+                "those mediators will defend."
+            ),
+            consumer_pressure=(
+                "Consumers are driving more treatment initiation. That raises the "
+                "cost of an empty specialist/payer mind, it does not replace them."
+            ),
+            comparative_evidenced=ChecklistAnswer.NO,
+            epistemic=EpistemicStatus.INFERRED,
+        ),
+        envelopes=[
+            InboundEnvelope(
+                source=ClaimSource.HUMAN,
+                epistemic=EpistemicStatus.VERIFIED,
+                citation="CCO briefing 2026-08-01",
+                text=(
+                    "Global GLP-1 communications must hold specialist and payer trust "
+                    "while consumers initiate more treatment decisions."
+                ),
+            ),
+            InboundEnvelope(
+                source=ClaimSource.WEB,
+                epistemic=EpistemicStatus.VERIFIED,
+                citation="FDA label tirzepatide chronic weight management",
+                text=(
+                    "Tirzepatide is a dual GIP and GLP-1 receptor agonist approved "
+                    "for chronic weight management in adults with obesity."
+                ),
+            ),
+            InboundEnvelope(
+                source=ClaimSource.HUMAN,
+                epistemic=EpistemicStatus.VERIFIED,
+                citation="access working session",
+                text=(
+                    "PBM formulary committees and endocrinology KOLs remain the "
+                    "gate between consumer demand and a covered prescription."
                 ),
             ),
         ],

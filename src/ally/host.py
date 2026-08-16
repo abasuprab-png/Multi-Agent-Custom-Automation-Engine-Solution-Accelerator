@@ -14,7 +14,11 @@ from ally.enums import ExecutionAgent
 from ally.exceptions import AllyError
 from ally.execution import _parse_handoff, accept_handoff, assert_agent
 from ally.execution_host import execution_agent_from_env, run_execution_host
-from ally.fixtures import gi_ae_contradiction_input, happy_path_input
+from ally.fixtures import (
+    gi_ae_contradiction_input,
+    happy_path_input,
+    lilly_glp1_cco_input,
+)
 from ally.foundry import AllyInvokeRequest, SessionStore, handle_invoke
 from ally.foundry_project import DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT
 from ally.lock import issue_lock
@@ -65,6 +69,9 @@ class AllyInvocationHandler(BaseHTTPRequestHandler):
             return
         if path == "/fixtures/happy":
             self._send_json(200, happy_path_input().model_dump(mode="json"))
+            return
+        if path == "/fixtures/lilly-glp1":
+            self._send_json(200, lilly_glp1_cco_input().model_dump(mode="json"))
             return
         if path.startswith("/digest/"):
             session_id = path.split("/digest/", 1)[1]

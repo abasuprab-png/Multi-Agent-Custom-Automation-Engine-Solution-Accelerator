@@ -48,8 +48,28 @@ NOTES_SCHEMA = {
             "maxItems": 5,
             "items": {"type": "string", "maxLength": 120},
         },
+        "unmet_need": {"type": "string", "maxLength": 200},
+        "distinctive_solve": {"type": "string", "maxLength": 200},
+        "white_space": {"type": "string", "maxLength": 200},
+        "primary_influencers": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {"type": "string", "maxLength": 40},
+        },
+        "trust_dynamic": {"type": "string", "maxLength": 200},
+        "consumer_pressure": {"type": "string", "maxLength": 200},
     },
-    "required": ["notes", "flagged_contradictions", "open_questions"],
+    "required": [
+        "notes",
+        "flagged_contradictions",
+        "open_questions",
+        "unmet_need",
+        "distinctive_solve",
+        "white_space",
+        "primary_influencers",
+        "trust_dynamic",
+        "consumer_pressure",
+    ],
 }
 
 
@@ -59,6 +79,12 @@ class AllyPassNotes(BaseModel):
     notes: str = Field(max_length=NOTES_MAX_LENGTH)
     flagged_contradictions: list[str] = Field(default_factory=list, max_length=5)
     open_questions: list[str] = Field(default_factory=list, max_length=5)
+    unmet_need: str = ""
+    distinctive_solve: str = ""
+    white_space: str = ""
+    primary_influencers: list[str] = Field(default_factory=list)
+    trust_dynamic: str = ""
+    consumer_pressure: str = ""
 
 
 class AllyLLM(Protocol):
@@ -132,9 +158,11 @@ def _pass_instructions(ally_pass: AllyPass) -> str:
     if ally_pass is AllyPass.DISCOVERY_COUNSEL:
         return (
             "This is Discovery+Counsel (thinking, gpt-5.6-sol). "
-            "Read the ingested claims and spine. Name contradictions, missing "
-            "admissibility answers, and genre defects in one or two short sentences. "
-            "Do not invent facts. Do not rewrite verified claims. Do not release Lexie/RCC."
+            "Read the ingested claims and spine. Identify the CCO strategic insight: "
+            "unmet need, distinctive solve, influencer white space, and trust dynamic. "
+            "Name contradictions and missing admissibility in one or two short sentences. "
+            "Do not invent share, rank, or competitor facts. Do not rewrite verified claims. "
+            "Do not release Lexie/RCC."
         )
     if ally_pass is AllyPass.EVIDENCE_RECONCILIATION:
         return (

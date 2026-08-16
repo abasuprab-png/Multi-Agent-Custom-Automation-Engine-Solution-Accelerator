@@ -53,4 +53,12 @@ def test_happy_path_admissibility_passes():
     codes = {issue.code for issue in session.critique.issues}
     assert CritiqueCode.ADMISSIBILITY_CATALYST not in codes
     assert CritiqueCode.ADMISSIBILITY_TENSION not in codes
-    assert session.diagnosis.canon_citations == ["ADM-1", "ADM-2"]
+    assert session.diagnosis.canon_citations == [
+        "ADM-1",
+        "ADM-2",
+        "SI-1",
+        "SI-2",
+        "SI-3",
+        "SI-4",
+        "SI-5",
+    ]

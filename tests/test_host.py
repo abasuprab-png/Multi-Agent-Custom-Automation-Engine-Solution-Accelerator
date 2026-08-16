@@ -94,6 +94,8 @@ def test_stdlib_host_readiness_and_gi_ae_interrupt():
         assert "Signing does not release Lexie" in html
         assert "HMAC" in html
         assert "Entra" in html
+        assert "Strategic insight" in html
+        assert "Lilly GLP-1" in html
 
         sign = HTTPConnection(host, port, timeout=5)
         sign.request(

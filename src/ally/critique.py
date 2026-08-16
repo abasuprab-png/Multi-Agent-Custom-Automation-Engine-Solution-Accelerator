@@ -14,6 +14,7 @@ from ally.contracts import (
 from ally.cross_claim import check_cross_claims
 from ally.enums import ChecklistAnswer, CritiqueCode, EpistemicStatus, Genre
 from ally.firewall import hits as firewall_hits
+from ally.insight import critique_insight
 from ally.knowledge import genre_lede_ok, query_canon
 
 _EFFICACY_HINT = re.compile(
@@ -42,8 +43,12 @@ def run_self_critique(diagnosis: AllyStrategicDiagnosis) -> CritiqueReport:
     issues.extend(check_cross_claims(diagnosis.claims))
     issues.extend(_estimand(diagnosis.claims))
     issues.extend(_intensifier(diagnosis.claims, diagnosis.spine_candidates))
+    if diagnosis.insight is not None:
+        issues.extend(_intensifier_in(diagnosis.insight.distinctive_solve))
+        issues.extend(_intensifier_in(diagnosis.insight.unmet_need))
     issues.extend(_genre(diagnosis.spine_candidates))
     issues.extend(_firewall(diagnosis))
+    issues.extend(critique_insight(diagnosis.insight))
     return CritiqueReport(issues=issues)
 
 

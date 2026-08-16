@@ -41,6 +41,8 @@ def category_for_code(code: CritiqueCode) -> CorrectionCategory:
         return CorrectionCategory.VOCAB_FIREWALL
     if code is CritiqueCode.UNRESOLVED_OPEN:
         return CorrectionCategory.EVIDENCE_GAP
+    if code is CritiqueCode.STRATEGIC_INSIGHT:
+        return CorrectionCategory.STRATEGIC_INSIGHT
     return _never(code)
 
 

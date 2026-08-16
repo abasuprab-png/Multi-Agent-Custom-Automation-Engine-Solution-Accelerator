@@ -60,6 +60,7 @@ class CritiqueCode(str, Enum):
     GENRE = "genre"
     VOCAB_FIREWALL = "vocab_firewall"
     UNRESOLVED_OPEN = "unresolved_open"
+    STRATEGIC_INSIGHT = "strategic_insight"
 
 
 class CorrectionCategory(str, Enum):
@@ -71,6 +72,7 @@ class CorrectionCategory(str, Enum):
     INTENSIFIER = "intensifier"
     GENRE = "genre"
     VOCAB_FIREWALL = "vocab_firewall"
+    STRATEGIC_INSIGHT = "strategic_insight"
 
 
 class QuarantineReason(str, Enum):
