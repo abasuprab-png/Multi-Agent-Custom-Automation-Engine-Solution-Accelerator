@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Never, Protocol
+from typing import Any, Never, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -30,13 +30,24 @@ ENV_THINKING = "AZURE_AI_THINKING_DEPLOYMENT"
 ENV_DOING = "AZURE_AI_DOING_DEPLOYMENT"
 ENV_LIVE = "ALLY_LIVE_LLM"
 
+MAX_OUTPUT_TOKENS = 4096
+NOTES_MAX_LENGTH = 400
+
 NOTES_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        "notes": {"type": "string"},
-        "flagged_contradictions": {"type": "array", "items": {"type": "string"}},
-        "open_questions": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "string", "maxLength": NOTES_MAX_LENGTH},
+        "flagged_contradictions": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {"type": "string", "maxLength": 120},
+        },
+        "open_questions": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {"type": "string", "maxLength": 120},
+        },
     },
     "required": ["notes", "flagged_contradictions", "open_questions"],
 }
@@ -45,9 +56,9 @@ NOTES_SCHEMA = {
 class AllyPassNotes(BaseModel):
     """Advisory model output. Never replaces ingest, critique, or the lock."""
 
-    notes: str
-    flagged_contradictions: list[str] = Field(default_factory=list)
-    open_questions: list[str] = Field(default_factory=list)
+    notes: str = Field(max_length=NOTES_MAX_LENGTH)
+    flagged_contradictions: list[str] = Field(default_factory=list, max_length=5)
+    open_questions: list[str] = Field(default_factory=list, max_length=5)
 
 
 class AllyLLM(Protocol):
@@ -122,14 +133,15 @@ def _pass_instructions(ally_pass: AllyPass) -> str:
         return (
             "This is Discovery+Counsel (thinking, gpt-5.6-sol). "
             "Read the ingested claims and spine. Name contradictions, missing "
-            "admissibility answers, and genre defects. Do not invent facts. "
-            "Do not rewrite verified claims. Do not release Lexie/RCC."
+            "admissibility answers, and genre defects in one or two short sentences. "
+            "Do not invent facts. Do not rewrite verified claims. Do not release Lexie/RCC."
         )
     if ally_pass is AllyPass.EVIDENCE_RECONCILIATION:
         return (
             "This is Evidence Reconciliation (doing, gpt-5.6-terra). "
             "Re-read at low temperature. Flag GI-AE vs discontinuation spin, "
             "estimand-less percentages, and intensifiers without a cited number. "
+            "Keep notes to one or two short sentences. "
             "Do not drop verified claims. Do not auto-execute."
         )
     return _never(ally_pass)
@@ -206,11 +218,15 @@ class FoundryAllyLLM:
         }
         request = {
             "model": deployment,
-            "instructions": f"{SYSTEM_PROMPT}\n\n{_pass_instructions(ally_pass)}",
+            "instructions": (
+                f"{SYSTEM_PROMPT}\n\n{_pass_instructions(ally_pass)}\n\n"
+                "Return only complete JSON matching the schema. "
+                f"notes must be under {NOTES_MAX_LENGTH} characters."
+            ),
             "input": json.dumps(payload),
             "temperature": config.temperature,
             "reasoning": {"effort": _reasoning_effort(ally_pass)},
-            "max_output_tokens": 800,
+            "max_output_tokens": MAX_OUTPUT_TOKENS,
             "store": False,
             "text": {
                 "format": {
@@ -226,7 +242,48 @@ class FoundryAllyLLM:
         except Exception:
             request.pop("temperature", None)
             response = self._openai().responses.create(**request)
-        text = getattr(response, "output_text", None) or ""
-        if not text:
-            raise ValueError("Responses API returned empty output_text")
+        return notes_from_response(response)
+
+
+def notes_from_response(response: Any) -> AllyPassNotes:
+    text = getattr(response, "output_text", None) or ""
+    status = getattr(response, "status", None)
+    if not text:
+        reason = _incomplete_reason(response) or "empty_output_text"
+        raise ValueError(f"Responses API returned no notes ({reason})")
+    try:
+        return parse_pass_notes(text)
+    except ValueError:
+        if status == "incomplete":
+            raise ValueError(
+                f"incomplete_response:{_incomplete_reason(response) or status}"
+            ) from None
+        raise
+
+
+def parse_pass_notes(text: str) -> AllyPassNotes:
+    try:
         return AllyPassNotes.model_validate_json(text)
+    except Exception:
+        extracted = extract_json_object(text)
+        if extracted is None:
+            raise ValueError("invalid_json") from None
+        return AllyPassNotes.model_validate(extracted)
+
+
+def extract_json_object(text: str) -> dict[str, Any] | None:
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        parsed = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _incomplete_reason(response: Any) -> str | None:
+    details = getattr(response, "incomplete_details", None)
+    reason = getattr(details, "reason", None)
+    return str(reason) if reason else None

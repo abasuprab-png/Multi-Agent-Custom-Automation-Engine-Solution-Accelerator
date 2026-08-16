@@ -3,7 +3,18 @@
 from ally.enums import AllyPass, CritiqueCode
 from ally.fixtures import gi_ae_contradiction_input
 from ally.foundry_project import MODEL_DOING_DEPLOYMENT, MODEL_THINKING_DEPLOYMENT
-from ally.llm import AllyPassNotes, NoOpAllyLLM, llm_enabled, llm_from_env
+from ally.llm import (
+    MAX_OUTPUT_TOKENS,
+    NOTES_MAX_LENGTH,
+    NOTES_SCHEMA,
+    AllyPassNotes,
+    NoOpAllyLLM,
+    extract_json_object,
+    llm_enabled,
+    llm_from_env,
+    notes_from_response,
+    parse_pass_notes,
+)
 from ally.passes import DISCOVERY_COUNSEL, EVIDENCE_RECONCILIATION, pass_record
 from ally.runtime import run_vertical_slice
 
@@ -22,7 +33,10 @@ class _FakeLLM:
         return pass_record(ally_pass, live=True), notes
 
 
-def test_pytest_default_is_noop_and_not_live():
+def test_pytest_default_is_noop_and_not_live(monkeypatch):
+    monkeypatch.delenv("ALLY_LIVE_LLM", raising=False)
+    monkeypatch.delenv("FOUNDRY_PROJECT_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_AI_PROJECT_ENDPOINT", raising=False)
     assert llm_enabled() is False
     assert isinstance(llm_from_env(), NoOpAllyLLM)
     session = run_vertical_slice(gi_ae_contradiction_input())
@@ -51,3 +65,32 @@ def test_fake_llm_notes_do_not_bypass_gi_ae_or_lock():
     assert CritiqueCode.CROSS_CLAIM in codes
     assert session.stage.value == "human_strategic_lock"
     assert session.lock is None
+
+
+def test_live_call_budget_fits_reasoning_plus_short_json():
+    assert MAX_OUTPUT_TOKENS >= 4096
+    assert NOTES_SCHEMA["properties"]["notes"]["maxLength"] == NOTES_MAX_LENGTH == 400
+
+
+def test_parse_pass_notes_recovers_wrapped_json():
+    wrapped = 'prefix {"notes":"GI-AE vs discontinuation","flagged_contradictions":["gi-ae"],"open_questions":[]} suffix'
+    notes = parse_pass_notes(wrapped)
+    assert notes.notes == "GI-AE vs discontinuation"
+    assert notes.flagged_contradictions == ["gi-ae"]
+    assert extract_json_object("truncated {\"notes\":\"no close") is None
+
+
+class _Incomplete:
+    def __init__(self, text: str, status: str, reason: str) -> None:
+        self.output_text = text
+        self.status = status
+        self.incomplete_details = type("Details", (), {"reason": reason})()
+
+
+def test_incomplete_truncated_json_is_an_error():
+    try:
+        notes_from_response(_Incomplete('{"notes":"cut', "incomplete", "max_output_tokens"))
+    except ValueError as exc:
+        assert "incomplete_response:max_output_tokens" in str(exc)
+    else:
+        raise AssertionError("expected incomplete_response")

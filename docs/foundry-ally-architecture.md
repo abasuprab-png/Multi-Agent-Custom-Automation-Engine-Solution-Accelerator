@@ -10,7 +10,7 @@ Ally remains a sequence-locked state machine with typed objects. Foundry is the 
 | --- | --- |
 | Agent type | **One Hosted agent** named `ally`, custom Python running `ally-runtime` |
 | Protocol | **Invocations** (`POST /invocations`, protocol `1.0.0`) |
-| Model | **One** Direct-from-Azure frontier reasoning deployment, used for both Ally passes |
+| Model | **Two** Direct-from-Azure GPT-5.6 deployments: `gpt-5.6-sol` thinks, `gpt-5.6-terra` does |
 | Passes | Discovery+Counsel at temperature `0.35` / generous thinking; Evidence Reconciliation at `0.0` / tight thinking |
 | Human Strategic Lock | Invocations **interrupt**. `apply_lock` is a second call. Never auto-execute. |
 | Lexie / RCC | Later Hosted agents that accept only `AgentHandoff` JSON. Not now. |
@@ -146,26 +146,26 @@ Use models **sold directly by Azure**. Those draw Microsoft for Startups / spons
 | --- | --- | --- |
 | Region | **East US 2** | Hosted agents are available; `gpt-5.2` Global Standard is listed for East US 2 ([region availability](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure-region-availability), [hosted agents](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/hosted-agents)) |
 | Project | New **Foundry (new)** project, not a classic hub project | Hub projects are limited to older models |
-| Model | **One** deployment: `gpt-5.2` (2025-12-11), **Global Standard** | Frontier reasoning, Direct-from-Azure, pay-per-token. Same deployment for both passes. |
+| Model | **Two** Direct-from-Azure GPT-5.6 deployments: `gpt-5.6-sol` (thinking) and `gpt-5.6-terra` (doing) | User override of the earlier single `gpt-5.2` plan. Both draw sponsorship credits. Not Claude. |
 | SKU | Standard / Global Standard, **not** Provisioned (PTU) | PTU burns credits whether you run Ally or not |
 | TPM | Start at **50k–100k TPM** | Vertical slice, not a swarm. Raise only if 429s appear. |
 | Fallback if `gpt-5.2` is gated | `gpt-5` Global Standard, same region | Still Direct-from-Azure. Request GPT-5.x access if the catalog shows a lock. |
 | Do not deploy | Claude, Grok, Llama, Mistral, extra GPT-5-mini "recon" deployment, image models | Credits and/or a second implicit agent |
 
-Both Ally passes call this one deployment via the project's Responses API (`AIProjectClient` → `get_openai_client().responses.create`). Difference is parameters, not identity:
+Both passes call the project's Responses API (`AIProjectClient` → `get_openai_client().responses.create`). Thinking and doing are different 5.6 deployments, not a mini/nano split:
 
-| Pass | Temperature | Thinking | `reasoning.effort` (when the API exposes it) |
-| --- | --- | --- | --- |
-| Discovery+Counsel | `0.35` | generous | `high` or `medium` |
-| Evidence Reconciliation | `0.0` | tight | `low` |
+| Pass | Deployment | Work | Temperature | `reasoning.effort` |
+| --- | --- | --- | --- | --- |
+| Discovery+Counsel | `gpt-5.6-sol` | thinking | `0.35` | `high` |
+| Evidence Reconciliation | `gpt-5.6-terra` | doing | `0.0` | `low` |
 
-Do not "save money" by sending reconciliation to a mini/nano model. The runtime contract is `model_tier="frontier_reasoning"` for both.
+Do not send either pass to Luna, mini, nano, or Claude. Deterministic critique still runs after both calls.
 
 First hosted deploy may keep the current deterministic slice (no live LLM). That spends almost no inference credits and still proves Invocations + lock. Turn the model on in a second deploy once the invoke contract is green in Foundry.
 
 ### Credit hygiene (~$5k)
 
-- One project, one model, one hosted agent.
+- One project, two 5.6 deployments, one hosted agent.
 - Hosted compute bills while a session is **active**; idle timeout is 15 minutes. Do not leave playground sessions open.
 - No PTU reservation.
 - No Marketplace models.
@@ -264,7 +264,7 @@ Do not convert production traces into a generic chat dataset and "optimize" the 
 ### First deploy (credits: project + traces + optional zero-token host)
 
 1. Create Foundry project in East US 2; connect App Insights.
-2. Deploy **one** `gpt-5.2` Global Standard (or skip the model if hosting the deterministic slice first).
+2. Deploy `gpt-5.6-sol` (thinking) and `gpt-5.6-terra` (doing) Global Standard. Do not wire Claude.
 3. Add a thin `InvocationAgentServerHost` wrapper (new small package extra). Zip-deploy Hosted agent `ally`, Invocations only.
 4. Invoke GI-AE JSON against the cloud endpoint. Confirm interrupt. Confirm unsigned `enter_execution` fails.
 5. Stop. Do not add Lexie, RCC, CT.gov HTTP, CAMS, ACR, Cosmos, Teams, or a second model.
