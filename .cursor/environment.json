@@ -1,0 +1,26 @@
+{
+  "name": "Multi-Agent Custom Automation Engine",
+  "install": "bash ./.cursor/install.sh",
+  "terminals": [
+    {
+      "name": "mcp-server",
+      "command": "cd src/mcp_server && PATH=\"$HOME/.local/bin:$PATH\" uv run python mcp_server.py --transport http --host 0.0.0.0 --port 9000 --no-auth",
+      "description": "MACAE MCP tool server (FastMCP) on http://localhost:9000/mcp. Fully self-contained; no Azure required."
+    },
+    {
+      "name": "backend-api",
+      "command": "bash ./.cursor/start-backend.sh",
+      "description": "Backend FastAPI service on http://localhost:8000 (docs at /docs). Boots with placeholders; real Azure secrets take precedence when set."
+    },
+    {
+      "name": "frontend",
+      "command": "cd src/App && npm run dev -- --host 0.0.0.0 --port 3001",
+      "description": "Vite dev server for the React frontend on http://localhost:3001. Calls the backend at http://localhost:8000/api."
+    }
+  ],
+  "ports": [
+    { "name": "frontend", "port": 3001 },
+    { "name": "backend-api", "port": 8000 },
+    { "name": "mcp-server", "port": 9000 }
+  ]
+}
