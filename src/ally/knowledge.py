@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from ally.enums import EstimandBasis, Genre
 from ally.exceptions import RefusalError
+
+DOCS_DIR = Path(__file__).resolve().parent / "knowledge_docs"
 
 _COMPLETED_ACTION = (
     "has approved",
@@ -37,7 +40,70 @@ class CanonRule:
     body: str
 
 
-CANON: dict[str, CanonRule] = {
+@dataclass(frozen=True)
+class GenreExample:
+    genre: Genre
+    tag: str
+    lede: str
+    path: str
+
+
+def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    if not text.startswith("---"):
+        return {}, text.strip()
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return {}, text.strip()
+    meta: dict[str, str] = {}
+    for line in parts[1].splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        meta[key.strip()] = value.strip()
+    return meta, parts[2].strip()
+
+
+def _load_canon() -> dict[str, CanonRule]:
+    loaded: dict[str, CanonRule] = {}
+    root = DOCS_DIR / "canon"
+    if not root.is_dir():
+        return loaded
+    for path in sorted(root.glob("*.md")):
+        meta, body = _parse_frontmatter(path.read_text(encoding="utf-8"))
+        rule_id = meta.get("id")
+        title = meta.get("title")
+        if not rule_id or not title or not body:
+            continue
+        loaded[rule_id] = CanonRule(id=rule_id, title=title, body=body)
+    return loaded
+
+
+def _load_genre_library() -> tuple[GenreExample, ...]:
+    examples: list[GenreExample] = []
+    root = DOCS_DIR / "genre"
+    if not root.is_dir():
+        return ()
+    for path in sorted(root.glob("*.md")):
+        meta, body = _parse_frontmatter(path.read_text(encoding="utf-8"))
+        raw_genre = meta.get("genre", Genre.APPROVAL_RELEASE.value)
+        try:
+            genre = Genre(raw_genre)
+        except ValueError:
+            continue
+        if not body:
+            continue
+        examples.append(
+            GenreExample(
+                genre=genre,
+                tag=meta.get("tag", path.stem),
+                lede=body.splitlines()[0],
+                path=str(path.relative_to(DOCS_DIR)),
+            )
+        )
+    return tuple(examples)
+
+
+_FALLBACK_CANON: dict[str, CanonRule] = {
     "ADM-1": CanonRule(
         id="ADM-1",
         title="Catalyst must be external and dated",
@@ -59,6 +125,8 @@ CANON: dict[str, CanonRule] = {
         ),
     ),
 }
+
+CANON: dict[str, CanonRule] = {**_FALLBACK_CANON, **_load_canon()}
 
 ESTIMAND_LEXICON: dict[EstimandBasis, str] = {
     EstimandBasis.TRIAL_PRODUCT: (
@@ -100,6 +168,14 @@ APPROVAL_RELEASE_LEDES: tuple[str, ...] = (
     ),
 )
 
+GENRE_LIBRARY: tuple[GenreExample, ...] = _load_genre_library()
+if GENRE_LIBRARY:
+    APPROVAL_RELEASE_LEDES = tuple(
+        example.lede
+        for example in GENRE_LIBRARY
+        if example.genre is Genre.APPROVAL_RELEASE
+    )
+
 
 def query_canon(*rule_ids: str) -> list[CanonRule]:
     """Return citable Canon rules. Unknown IDs are a refusal, not a paraphrase."""
@@ -114,6 +190,11 @@ def query_canon(*rule_ids: str) -> list[CanonRule]:
     if missing:
         raise RefusalError(f"Unknown Canon rule ids: {', '.join(missing)}")
     return found
+
+
+def query_genre(genre: Genre) -> list[GenreExample]:
+    """Return curated examples for a genre. Empty is not a paraphrase of another genre."""
+    return [example for example in GENRE_LIBRARY if example.genre is genre]
 
 
 _ABBREVIATION = re.compile(

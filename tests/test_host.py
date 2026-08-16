@@ -16,7 +16,13 @@ from ally.foundry_project import (
     PROJECT_RESOURCE_ID,
     RESOURCE_GROUP,
 )
-from ally.host import serve_stdlib
+from ally.host import serve_stdlib, use_foundry_adapter
+
+
+def test_local_host_does_not_require_foundry_adapter(monkeypatch):
+    monkeypatch.delenv("FOUNDRY_AGENT_NAME", raising=False)
+    monkeypatch.delenv("ALLY_STDLIB_HOST", raising=False)
+    assert use_foundry_adapter() is False
 
 
 def test_host_targets_commsos_prod_not_a_second_account():
@@ -77,6 +83,15 @@ def test_stdlib_host_readiness_and_gi_ae_interrupt():
         assert payload["stage"] == "human_strategic_lock"
         assert payload["agent_handoff"] is None
         assert payload["error"] is None
+
+        lock_page = HTTPConnection(host, port, timeout=5)
+        lock_page.request("GET", "/")
+        page = lock_page.getresponse()
+        html = page.read().decode("utf-8")
+        lock_page.close()
+        assert page.status == 200
+        assert "Human Strategic Lock" in html
+        assert "Signing does not release Lexie" in html
     finally:
         server.shutdown()
         server.server_close()

@@ -271,11 +271,13 @@ Do not convert production traces into a generic chat dataset and "optimize" the 
 
 ### Next PRs (ordered)
 
-1. Live LLM port: same `PassConfig`, `AIProjectClient` Responses calls, structured output into existing Pydantic types. pytest still uses fixtures when `FOUNDRY_PROJECT_ENDPOINT` is unset.
-2. `$HOME` session persistence so a lock can be applied after idle.
-3. Lock UI that posts `HumanStrategicLock` (Entra-bound `signed_by`).
-4. Lexie/RCC Hosted agents that validate `AgentHandoff`.
-5. Live `StructuredRetriever` behind the existing port.
+1. Live LLM port — done (`gpt-5.6-sol` / `gpt-5.6-terra`).
+2. `$HOME` session persistence — done.
+3. Lock UI that posts `HumanStrategicLock` — stdlib `GET /`. Entra-bound `signed_by` still uses the posted field.
+4. Lexie/RCC handlers that validate `AgentHandoff` — local `/execution/lexie` and `/execution/rcc`. Separate Foundry hosted images are the remaining deploy step.
+5. Live `StructuredRetriever` — ClinicalTrials.gov + openFDA behind `ALLY_LIVE_RETRIEVAL=1`.
+6. Web search + fetch — `ALLY_LIVE_WEB=1`.
+7. CAMS read-only port. Write remains a `LockGateError`.
 
 ## azure.yaml shape (first deploy, do not apply yet)
 

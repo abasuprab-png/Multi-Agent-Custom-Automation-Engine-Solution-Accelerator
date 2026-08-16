@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ally — Human Strategic Lock</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --ink: #e8eef4;
+      --muted: #93a1b1;
+      --line: #2a3644;
+      --accent: #d4a017;
+      --ok: #3d9b6e;
+      --bad: #c45c5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.45 "Source Serif 4", "Iowan Old Style", Georgia, serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header, main { max-width: 960px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+    header h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+    header p { margin: 0; color: var(--muted); }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+    button, input {
+      font: 14px/1.2 ui-sans-serif, system-ui, sans-serif;
+    }
+    button {
+      background: var(--accent);
+      color: #1a1404;
+      border: 0;
+      padding: 0.55rem 0.85rem;
+      cursor: pointer;
+    }
+    button.secondary { background: #314155; color: var(--ink); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    input {
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      padding: 0.5rem 0.65rem;
+      min-width: 12rem;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 1rem 1.1rem;
+      margin: 0.85rem 0;
+    }
+    h2 { font-size: 1rem; margin: 0 0 0.6rem; letter-spacing: 0.02em; }
+    ul { margin: 0; padding-left: 1.2rem; }
+    li { margin: 0.35rem 0; }
+    .badge { font: 12px/1 ui-sans-serif, system-ui, sans-serif; color: var(--muted); }
+    .bad { color: var(--bad); }
+    .ok { color: var(--ok); }
+    label { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.4rem 0; }
+    pre {
+      white-space: pre-wrap;
+      font: 12px/1.4 ui-monospace, monospace;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Human Strategic Lock</h1>
+    <p>Typed interrupt. Signing does not release Lexie or RCC. Execution is a second call.</p>
+  </header>
+  <main>
+    <div class="row">
+      <button id="giae" type="button">Load GI-AE fixture</button>
+      <button id="happy" type="button" class="secondary">Load happy path</button>
+      <button id="start" type="button">Start diagnosis</button>
+    </div>
+    <p class="badge" id="status">No session.</p>
+    <section>
+      <h2>Open decision points</h2>
+      <div id="decisions"><p class="badge">Start a diagnosis first.</p></div>
+    </section>
+    <section>
+      <h2>Critique</h2>
+      <ul id="critique"></ul>
+    </section>
+    <section>
+      <h2>Quarantine</h2>
+      <ul id="quarantine"></ul>
+    </section>
+    <section>
+      <h2>Sign the lock</h2>
+      <div class="row">
+        <input id="signed_by" placeholder="signed_by" value="lead-b" />
+        <input id="signature" placeholder="signature" value="sig-lead-b" />
+        <button id="lock" type="button" disabled>Apply lock</button>
+        <button id="enter" type="button" class="secondary" disabled>Enter execution</button>
+        <button id="lexie" type="button" class="secondary" disabled>Send to Lexie</button>
+      </div>
+      <p id="lockmsg" class="badge"></p>
+    </section>
+    <section>
+      <h2>Raw handoff</h2>
+      <pre id="raw"></pre>
+    </section>
+  </main>
+  <script>
+    const state = { sessionId: null, digest: null, handoff: null, agentHandoff: null, human: null };
+
+    async function loadFixture(name) {
+      const res = await fetch("/fixtures/" + name);
+      state.human = await res.json();
+      document.getElementById("status").textContent = "Loaded " + name + ". Start to run Ally.";
+    }
+
+    async function post(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return res.json();
+    }
+
+    function render(payload) {
+      state.sessionId = payload.session_id;
+      state.handoff = payload.handoff;
+      const dx = payload.handoff && payload.handoff.diagnosis;
+      state.digest = dx ? dx.digest || null : null;
+      if (dx && !state.digest) {
+        state.digest = payload.handoff.diagnosis_digest || null;
+      }
+      document.getElementById("status").textContent =
+        "session " + (payload.session_id || "none") +
+        " · stage " + (payload.stage || "?") +
+        " · interrupt " + String(payload.interrupt);
+      const points = (payload.handoff && payload.handoff.open_decision_points) || [];
+      const box = document.getElementById("decisions");
+      if (!points.length) {
+        box.innerHTML = "<p class='ok'>No blocking decision points. You may still sign.</p>";
+      } else {
+        box.innerHTML = points.map((p) => (
+          "<label><input type='checkbox' class='od' value='" + p.id + "' checked />" +
+          "<span>" + p.prompt + "</span></label>"
+        )).join("");
+      }
+      const issues = (payload.handoff && payload.handoff.critique && payload.handoff.critique.issues) || [];
+      document.getElementById("critique").innerHTML = issues.length
+        ? issues.map((i) => "<li class='bad'>" + i.code + " — " + i.message + "</li>").join("")
+        : "<li class='ok'>No critique issues.</li>";
+      const held = (payload.handoff && payload.handoff.quarantine) || [];
+      document.getElementById("quarantine").innerHTML = held.length
+        ? held.map((q) => "<li>" + q.reason + " — " + q.text + "</li>").join("")
+        : "<li class='badge'>Empty.</li>";
+      document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
+      document.getElementById("lock").disabled = !payload.session_id;
+      document.getElementById("enter").disabled = !payload.session_id;
+      document.getElementById("lockmsg").textContent = payload.error || "";
+    }
+
+    document.getElementById("giae").onclick = () => loadFixture("gi-ae");
+    document.getElementById("happy").onclick = () => loadFixture("happy");
+    document.getElementById("start").onclick = async () => {
+      if (!state.human) await loadFixture("gi-ae");
+      const payload = await post("/invocations", { op: "start", human: state.human });
+      if (payload.handoff && payload.handoff.diagnosis) {
+        const digestRes = await fetch("/digest/" + payload.session_id);
+        const digestBody = await digestRes.json();
+        state.digest = digestBody.digest;
+      }
+      render(payload);
+    };
+    document.getElementById("lock").onclick = async () => {
+      const ids = [...document.querySelectorAll(".od:checked")].map((el) => el.value);
+      const payload = await post("/invocations", {
+        op: "apply_lock",
+        session_id: state.sessionId,
+        lock: {
+          diagnosis_digest: state.digest,
+          signed_by: document.getElementById("signed_by").value,
+          signature: document.getElementById("signature").value,
+          closed_decision_ids: ids,
+        },
+      });
+      render(payload);
+      document.getElementById("lockmsg").textContent = payload.error
+        ? payload.error
+        : "Lock applied. Execution was not started.";
+    };
+    document.getElementById("enter").onclick = async () => {
+      const payload = await post("/invocations", {
+        op: "enter_execution",
+        session_id: state.sessionId,
+        to_agent: "lexie",
+      });
+      state.agentHandoff = payload.agent_handoff;
+      document.getElementById("lexie").disabled = !payload.agent_handoff;
+      document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
+      document.getElementById("lockmsg").textContent = payload.error
+        ? payload.error_type + ": " + payload.error
+        : "Execution released. AgentHandoff is ready for Lexie.";
+    };
+    document.getElementById("lexie").onclick = async () => {
+      const payload = await post("/execution/lexie", state.agentHandoff);
+      document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
+      document.getElementById("lockmsg").textContent = payload.error
+        ? payload.error
+        : "Lexie accepted typed AgentHandoff.";
+    };
+  </script>
+</body>
+</html>

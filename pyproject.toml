@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",
+    "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,9 @@ foundry = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+ally = ["knowledge_docs/**/*", "static/**/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

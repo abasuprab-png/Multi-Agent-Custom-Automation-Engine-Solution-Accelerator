@@ -19,7 +19,9 @@ Typed multi-agent runtime for strategic counsel. Magentic-style prompt routing i
 
 Ally is two internal passes, not two agents: Discovery+Counsel (temp 0.3–0.4) and Evidence Reconciliation (temp 0–0.1, same frontier tier).
 
-Local pytest does **not** call a live model. On Foundry, Discovery+Counsel uses `gpt-5.6-sol` (thinking) and Evidence Reconciliation uses `gpt-5.6-terra` (doing). Deterministic gates still run after both passes. This slice does not call CAMS or Lexie/RCC. Structured retrieval is a port (`StructuredRetriever`); the ClinicalTrials.gov fixture is what resolves REDEFINE-style estimand confusion. Identity inference is read from prose. Cross-claim rules live in a registry. The GI-AE fixture remains the eval for unsigned execution.
+Local pytest does **not** call a live model. On Foundry, Discovery+Counsel uses `gpt-5.6-sol` (thinking) and Evidence Reconciliation uses `gpt-5.6-terra` (doing). Deterministic gates still run after both passes.
+
+Tools are code: web search+fetch (`ALLY_LIVE_WEB=1`), ClinicalTrials.gov/openFDA (`ALLY_LIVE_RETRIEVAL=1`), Canon/genre documents under `src/ally/knowledge_docs/`, CAMS read-only, DelegationBrief, self-critique, human handoff, and Lexie/RCC handlers that accept only `AgentHandoff`. The lock UI is `GET /` on the stdlib host. Identity inference is read from prose. The GI-AE fixture remains the eval for unsigned execution. Working brief: [docs/ally-full-spec-goal.md](docs/ally-full-spec-goal.md).
 
 ## Foundry (host, not control plane)
 
@@ -37,8 +39,10 @@ Local host (no Azure credentials, no model):
 
 ```bash
 python3 main.py
+# GET  http://127.0.0.1:8088/          lock UI
 # GET  http://127.0.0.1:8088/readiness
 # POST http://127.0.0.1:8088/invocations
+# POST http://127.0.0.1:8088/execution/lexie
 ```
 
 Writer craft from the regulated-wire-editor doctrine is `review_draft()`. Findings never block. Deterministic gates stay in the claim pipeline.

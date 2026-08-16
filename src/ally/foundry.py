@@ -20,6 +20,7 @@ from ally.contracts import (
 )
 from ally.enums import ExecutionAgent, Stage
 from ally.exceptions import AllyError
+from ally.memory import MemoryStore
 from ally.retrieval import StructuredRetriever
 from ally.runtime import AllySession, run_vertical_slice
 
@@ -102,8 +103,13 @@ class SessionSnapshot(BaseModel):
 class SessionStore:
     """In-process session map with optional $HOME persistence."""
 
-    def __init__(self, persist_dir: Path | str | None = None) -> None:
+    def __init__(
+        self,
+        persist_dir: Path | str | None = None,
+        memory: MemoryStore | None = None,
+    ) -> None:
         self._sessions: dict[str, AllySession] = {}
+        self.memory = memory or MemoryStore()
         self._persist_dir = Path(persist_dir) if persist_dir is not None else None
         if self._persist_dir is not None:
             self._persist_dir.mkdir(parents=True, exist_ok=True)
@@ -111,9 +117,13 @@ class SessionStore:
     @classmethod
     def under_home(cls) -> SessionStore:
         home = Path(os.environ.get("HOME", "/tmp"))
-        return cls(persist_dir=home / "ally-sessions")
+        return cls(
+            persist_dir=home / "ally-sessions",
+            memory=MemoryStore.under_home(),
+        )
 
     def put(self, session: AllySession) -> AllySession:
+        session.memory = self.memory
         self._sessions[session.session_id] = session
         self._write(session)
         return session
@@ -146,7 +156,9 @@ class SessionStore:
         if path is None or not path.is_file():
             return None
         snapshot = SessionSnapshot.model_validate_json(path.read_text(encoding="utf-8"))
-        return snapshot.to_session()
+        session = snapshot.to_session()
+        session.memory = self.memory
+        return session
 
 
 def handle_invoke(
@@ -176,7 +188,13 @@ def _start(
             error_type="RefusalError",
             error="start requires a HumanInput object, not free text",
         )
-    session = store.put(run_vertical_slice(request.human, retriever=retriever))
+    session = store.put(
+        run_vertical_slice(
+            request.human,
+            retriever=retriever,
+            memory=store.memory,
+        )
+    )
     return AllyInvokeResponse(
         session_id=session.session_id,
         stage=session.stage,

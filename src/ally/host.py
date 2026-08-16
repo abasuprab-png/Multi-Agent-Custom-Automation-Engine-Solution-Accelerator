@@ -6,9 +6,14 @@ import json
 import logging
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from ally.enums import ExecutionAgent
+from ally.exceptions import AllyError
+from ally.execution import _parse_handoff, accept_handoff, assert_agent
+from ally.fixtures import gi_ae_contradiction_input, happy_path_input
 from ally.foundry import AllyInvokeRequest, SessionStore, handle_invoke
 from ally.foundry_project import DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT
 
@@ -23,6 +28,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 STORE = SessionStore.under_home()
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 def listen_port() -> int:
@@ -49,26 +55,61 @@ class AllyInvocationHandler(BaseHTTPRequestHandler):
         if path in {"/readiness", "/health"}:
             self._send_json(200, {"status": "ok"})
             return
+        if path in {"/", "/lock", "/lock.html"}:
+            self._send_file(STATIC_DIR / "lock.html", "text/html; charset=utf-8")
+            return
+        if path == "/fixtures/gi-ae":
+            self._send_json(200, gi_ae_contradiction_input().model_dump(mode="json"))
+            return
+        if path == "/fixtures/happy":
+            self._send_json(200, happy_path_input().model_dump(mode="json"))
+            return
+        if path.startswith("/digest/"):
+            session_id = path.split("/digest/", 1)[1]
+            session = self.store.get(session_id)
+            if session is None:
+                self._send_json(404, {"error": "unknown session"})
+                return
+            self._send_json(200, {"digest": session.diagnosis.digest()})
+            return
         self._send_json(404, {"error": "not_found"})
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path != "/invocations":
-            self._send_json(404, {"error": "not_found"})
-            return
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length)
-        query = parse_qs(parsed.query)
-        session_id = (query.get("agent_session_id") or [None])[0]
-        try:
-            body = dispatch(raw, self.store, session_id=session_id)
-        except Exception as exc:
-            self._send_json(
-                400,
-                {"error_type": type(exc).__name__, "error": str(exc)},
-            )
+        if parsed.path == "/invocations":
+            query = parse_qs(parsed.query)
+            session_id = (query.get("agent_session_id") or [None])[0]
+            try:
+                body = dispatch(raw, self.store, session_id=session_id)
+            except Exception as exc:
+                self._send_json(
+                    400,
+                    {"error_type": type(exc).__name__, "error": str(exc)},
+                )
+                return
+            self._send_json(200, body)
             return
-        self._send_json(200, body)
+        if parsed.path in {"/execution/lexie", "/execution/rcc"}:
+            expected = (
+                ExecutionAgent.LEXIE
+                if parsed.path.endswith("lexie")
+                else ExecutionAgent.RCC
+            )
+            try:
+                handoff = _parse_handoff(raw.decode("utf-8"))
+                assert_agent(handoff, expected)
+                accepted = accept_handoff(handoff)
+            except (AllyError, ValueError) as exc:
+                self._send_json(
+                    400,
+                    {"error_type": type(exc).__name__, "error": str(exc)},
+                )
+                return
+            self._send_json(200, accepted.model_dump(mode="json"))
+            return
+        self._send_json(404, {"error": "not_found"})
 
     def _send_json(self, status: int, payload: dict) -> None:
         encoded = json.dumps(payload).encode("utf-8")
@@ -77,6 +118,17 @@ class AllyInvocationHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
+
+    def _send_file(self, path: Path, content_type: str) -> None:
+        if not path.is_file():
+            self._send_json(404, {"error": "not_found"})
+            return
+        data = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
 
 def make_handler(store: SessionStore) -> type[AllyInvocationHandler]:
@@ -98,10 +150,18 @@ def serve_stdlib(
     return server
 
 
+def use_foundry_adapter() -> bool:
+    if InvocationAgentServerHost is None:
+        return False
+    if os.environ.get("ALLY_STDLIB_HOST", "").strip().lower() in {"1", "true", "yes"}:
+        return False
+    return bool(os.environ.get("FOUNDRY_AGENT_NAME"))
+
+
 def run_host() -> None:
-    """Default entrypoint. Adapter if installed; stdlib otherwise. No model required."""
+    """Default entrypoint. Adapter only inside a Foundry hosted sandbox."""
     logging.basicConfig(level=logging.INFO)
-    if InvocationAgentServerHost is not None:
+    if use_foundry_adapter():
         _run_foundry_adapter()
         return
     server = serve_stdlib()

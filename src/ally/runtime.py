@@ -26,10 +26,13 @@ from ally.enums import (
 )
 from ally.exceptions import LockGateError, SequenceLockError
 from ally.ingest import ingest_envelopes, inferred_texts, unresolved_texts
+from ally.cams import CamsReader
+from ally.clinical import retriever_from_env
 from ally.knowledge import query_canon
 from ally.llm import AllyLLM, llm_from_env
-from ally.memory import MemoryStore
+from ally.memory import MemoryStore, category_for_code
 from ally.retrieval import RetrievalQuery, StructuredRetriever, prefer_primary
+from ally.web import WebSearcher, searcher_from_env
 
 
 def next_stage(current: Stage) -> Stage | None:
@@ -95,6 +98,7 @@ class AllySession:
                 + ", ".join(sorted(leftover))
             )
         self.lock = lock
+        self._record_lock_overrides(lock)
 
     def enter_execution(
         self, *, to_agent: ExecutionAgent | str = ExecutionAgent.LEXIE
@@ -126,6 +130,19 @@ class AllySession:
             raise LockGateError("Lock signature does not match the current diagnosis")
         return self.lock
 
+    def _record_lock_overrides(self, lock: HumanStrategicLock) -> None:
+        closed = set(lock.closed_decision_ids)
+        for point in self.diagnosis.open_decision_points:
+            if point.id not in closed:
+                continue
+            for code in point.related_codes:
+                self.memory.record_correction(
+                    self.client_id,
+                    category_for_code(code),
+                    point.prompt,
+                )
+        self.memory.remember_lead(self.client_id, lock.signed_by, "signed lock")
+
 
 def run_vertical_slice(
     human: HumanInput,
@@ -133,13 +150,25 @@ def run_vertical_slice(
     memory: MemoryStore | None = None,
     retriever: StructuredRetriever | None = None,
     llm: AllyLLM | None = None,
+    searcher: WebSearcher | None = None,
+    cams: CamsReader | None = None,
 ) -> AllySession:
     """Discovery → Counsel → Retrieval → Reconciliation → Human Lock interrupt."""
     runner = llm if llm is not None else llm_from_env()
     claims, quarantine = ingest_envelopes(human.envelopes)
-    if retriever is not None:
+    web = searcher if searcher is not None else searcher_from_env()
+    if web is not None:
+        web_claims, web_held = ingest_envelopes(web.search(human))
+        claims = [*claims, *web_claims]
+        quarantine = [*quarantine, *web_held]
+    if cams is not None:
+        cams_claims, cams_held = ingest_envelopes(cams.read(human.client_id, human.brand_id))
+        claims = [*claims, *cams_claims]
+        quarantine = [*quarantine, *cams_held]
+    source = retriever if retriever is not None else retriever_from_env()
+    if source is not None:
         primary, held_primary = ingest_envelopes(
-            retriever.fetch(
+            source.fetch(
                 RetrievalQuery(
                     brand_id=human.brand_id,
                     task=human.task,
