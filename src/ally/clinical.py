@@ -48,14 +48,20 @@ def _get_json(url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
         response = httpx.get(
             url, params=params, timeout=retrieval_timeout(), follow_redirects=True
         )
-        response.raise_for_status()
-        payload = response.json()
     except httpx.TimeoutException as exc:
         raise RetrievalClosedError(f"timeout contacting {url}") from exc
     except httpx.HTTPError as exc:
         raise RetrievalClosedError(f"http error contacting {url}: {exc}") from exc
+    try:
+        if response.status_code >= 400:
+            raise RetrievalClosedError(f"http {response.status_code} contacting {url}")
+        payload = response.json()
     except json.JSONDecodeError as exc:
         raise RetrievalClosedError(f"malformed payload from {url}") from exc
+    except RetrievalClosedError:
+        raise
+    except Exception as exc:
+        raise RetrievalClosedError(f"malformed payload from {url}: {exc}") from exc
     if not isinstance(payload, dict):
         raise RetrievalClosedError(f"malformed payload from {url}")
     return payload

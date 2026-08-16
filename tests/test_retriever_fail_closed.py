@@ -23,7 +23,8 @@ def test_clinicaltrials_timeout_is_unresolved(monkeypatch):
 
 def test_openfda_malformed_payload_is_unresolved(monkeypatch):
     def fake_get(*args, **kwargs):
-        return httpx.Response(200, text="[1, 2, 3]")
+        request = httpx.Request("GET", "https://api.fda.gov/drug/label.json")
+        return httpx.Response(200, text="[1, 2, 3]", request=request)
 
     monkeypatch.setattr("ally.clinical.httpx.get", fake_get)
     envelopes = OpenFdaLabel().fetch(

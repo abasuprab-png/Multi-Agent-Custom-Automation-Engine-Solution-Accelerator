@@ -52,7 +52,6 @@ class HttpFetcher:
             response = httpx.get(
                 url, follow_redirects=True, timeout=retrieval_timeout()
             )
-            response.raise_for_status()
         except httpx.TimeoutException:
             return unresolved_envelope(
                 citation=url,
@@ -62,6 +61,11 @@ class HttpFetcher:
             return unresolved_envelope(
                 citation=url,
                 detail=f"http error fetching {_host(url)}: {exc}",
+            )
+        if response.status_code >= 400:
+            return unresolved_envelope(
+                citation=url,
+                detail=f"http {response.status_code} fetching {_host(url)}",
             )
         text = " ".join(response.text.split())
         if firewall_hits(text):
@@ -90,7 +94,13 @@ class DuckDuckGoSearcher:
                 },
                 timeout=retrieval_timeout(),
             )
-            response.raise_for_status()
+            if response.status_code >= 400:
+                return [
+                    unresolved_envelope(
+                        citation="web search",
+                        detail=f"http {response.status_code} contacting DuckDuckGo",
+                    )
+                ]
             payload = response.json()
         except httpx.TimeoutException:
             return [
