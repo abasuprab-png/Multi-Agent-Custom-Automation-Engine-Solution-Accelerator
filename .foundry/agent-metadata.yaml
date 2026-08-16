@@ -3,6 +3,22 @@ environments:
   prod:
     projectEndpoint: https://commsos-prod-resource.services.ai.azure.com/api/projects/commsos-prod
     agentName: ally
+    agentVersion: "1"
+    agentGuid: 48aa4ee2-2ca8-4bd1-93aa-e1153e6dc192
     azureContainerRegistry: allyruntimeeus2.azurecr.io
     image: allyruntimeeus2.azurecr.io/ally:202608161007
+    cpu: "0.5"
+    memory: 1Gi
+    protocols:
+      - protocol: invocations
+        version: 2.0.0
     evaluationSuites: []
+    provenInvoke:
+      start:
+        stage: human_strategic_lock
+        interrupt: true
+        agentHandoff: null
+      unsignedEnterExecution:
+        errorType: LockGateError
+        interrupt: true
+        agentHandoff: null
