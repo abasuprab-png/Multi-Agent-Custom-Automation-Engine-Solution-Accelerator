@@ -16,6 +16,10 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+foundry = [
+    "azure-ai-agentserver-invocations==1.0.0b7",
+    "azure-identity==1.25.3",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import os
 from enum import Enum
+from pathlib import Path
 from typing import Never
 
 from pydantic import BaseModel
 
-from ally.contracts import AgentHandoff, HumanHandoff, HumanInput, HumanStrategicLock
+from ally.contracts import (
+    AgentHandoff,
+    AllyStrategicDiagnosis,
+    CritiqueReport,
+    HumanHandoff,
+    HumanInput,
+    HumanStrategicLock,
+    QuarantineRecord,
+)
 from ally.enums import ExecutionAgent, Stage
 from ally.exceptions import AllyError
 from ally.retrieval import StructuredRetriever
@@ -44,18 +54,99 @@ class AllyInvokeResponse(BaseModel):
     error: str | None = None
 
 
-class SessionStore:
-    """In-process session map. First deploy can persist under $HOME; Cosmos is later."""
+class SessionSnapshot(BaseModel):
+    """Durable Ally session. Survives the hosted-agent 15-minute idle deprovision."""
 
-    def __init__(self) -> None:
+    session_id: str
+    client_id: str
+    brand_id: str
+    lead_id: str
+    diagnosis: AllyStrategicDiagnosis
+    critique: CritiqueReport
+    handoff: HumanHandoff
+    quarantine: list[QuarantineRecord]
+    stage: Stage
+    lock: HumanStrategicLock | None = None
+
+    @classmethod
+    def from_session(cls, session: AllySession) -> SessionSnapshot:
+        return cls(
+            session_id=session.session_id,
+            client_id=session.client_id,
+            brand_id=session.brand_id,
+            lead_id=session.lead_id,
+            diagnosis=session.diagnosis,
+            critique=session.critique,
+            handoff=session.handoff,
+            quarantine=list(session.quarantine),
+            stage=session.stage,
+            lock=session.lock,
+        )
+
+    def to_session(self) -> AllySession:
+        session = AllySession(
+            client_id=self.client_id,
+            brand_id=self.brand_id,
+            lead_id=self.lead_id,
+            diagnosis=self.diagnosis,
+            critique=self.critique,
+            handoff=self.handoff,
+            quarantine=list(self.quarantine),
+            session_id=self.session_id,
+        )
+        session.stage = self.stage
+        session.lock = self.lock
+        return session
+
+
+class SessionStore:
+    """In-process session map with optional $HOME persistence."""
+
+    def __init__(self, persist_dir: Path | str | None = None) -> None:
         self._sessions: dict[str, AllySession] = {}
+        self._persist_dir = Path(persist_dir) if persist_dir is not None else None
+        if self._persist_dir is not None:
+            self._persist_dir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def under_home(cls) -> SessionStore:
+        home = Path(os.environ.get("HOME", "/tmp"))
+        return cls(persist_dir=home / "ally-sessions")
 
     def put(self, session: AllySession) -> AllySession:
         self._sessions[session.session_id] = session
+        self._write(session)
         return session
 
     def get(self, session_id: str) -> AllySession | None:
-        return self._sessions.get(session_id)
+        cached = self._sessions.get(session_id)
+        if cached is not None:
+            return cached
+        loaded = self._read(session_id)
+        if loaded is not None:
+            self._sessions[session_id] = loaded
+        return loaded
+
+    def _path(self, session_id: str) -> Path | None:
+        if self._persist_dir is None:
+            return None
+        return self._persist_dir / f"{session_id}.json"
+
+    def _write(self, session: AllySession) -> None:
+        path = self._path(session.session_id)
+        if path is None:
+            return
+        path.write_text(
+            SessionSnapshot.from_session(session).model_dump_json(),
+            encoding="utf-8",
+        )
+
+    def _read(self, session_id: str) -> AllySession | None:
+        path = self._path(session_id)
+        if path is None or not path.is_file():
+            return None
+        snapshot = SessionSnapshot.model_validate_json(path.read_text(encoding="utf-8"))
+        return snapshot.to_session()
 
 
 def handle_invoke(
@@ -111,6 +202,7 @@ def _apply_lock(request: AllyInvokeRequest, store: SessionStore) -> AllyInvokeRe
         session.apply_lock(request.lock)
     except AllyError as exc:
         return _error(session, exc, interrupt=True)
+    store.put(session)
     return AllyInvokeResponse(
         session_id=session.session_id,
         stage=session.stage,
@@ -129,6 +221,7 @@ def _enter_execution(
         handoff = session.enter_execution(to_agent=request.to_agent)
     except AllyError as exc:
         return _error(session, exc, interrupt=session.lock is None)
+    store.put(session)
     return AllyInvokeResponse(
         session_id=session.session_id,
         stage=session.stage,

@@ -25,6 +25,32 @@ This slice does **not** call a live model, CAMS, or Lexie/RCC. Structured retrie
 
 Microsoft Foundry hosts **one** Invocations agent that calls `handle_invoke`. It does not become a prompt agent, Magentic graph, or second Ally. Human Strategic Lock is an interrupt: `start` returns `HumanHandoff`; `enter_execution` is unreachable until `apply_lock`. See [docs/foundry-ally-architecture.md](docs/foundry-ally-architecture.md).
 
+Target project (already exists — do not create a second account):
+
+- Subscription `85d4d146-1694-46a2-9830-43ec9f2c5ba2`
+- Resource group `sfg-commsos-prod`
+- Account `commsos-foundry-hub`
+- Project `CommsOS-Core`
+- Endpoint `https://commsos-foundry-hub.services.ai.azure.com/api/projects/CommsOS-Core`
+
+Local host (no Azure credentials, no model):
+
+```bash
+python3 main.py
+# GET  http://127.0.0.1:8088/readiness
+# POST http://127.0.0.1:8088/invocations
+```
+
+Writer craft from the regulated-wire-editor doctrine is `review_draft()`. Findings never block. Deterministic gates stay in the claim pipeline.
+
+Deploy to the existing project (after Azure login):
+
+```bash
+azd env set AZURE_SUBSCRIPTION_ID 85d4d146-1694-46a2-9830-43ec9f2c5ba2
+azd env set AZURE_AI_PROJECT_ENDPOINT https://commsos-foundry-hub.services.ai.azure.com/api/projects/CommsOS-Core
+azd ai agent deploy
+```
+
 ## Run
 
 ```bash

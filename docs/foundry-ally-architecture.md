@@ -175,18 +175,21 @@ First hosted deploy may keep the current deterministic slice (no live LLM). That
 
 ## Resource list
 
-### Provision now (first deploy)
+### Use the existing CommsOS project (do not provision a second account)
 
-| Resource | Purpose |
+| Resource | Value |
 | --- | --- |
-| Resource group `rg-ally-foundry-dev` | Single blast radius |
-| Microsoft Foundry account + **one** project `ally` | Host + model endpoint |
-| Model deployment `gpt-5.2` Global Standard | Both Ally passes |
-| Hosted agent `ally` (Invocations 1.0.0) | Runs `ally-runtime` |
-| Application Insights connected to the project | Server-side traces ([trace setup](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-setup)) |
-| Log Analytics workspace (created with App Insights) | Trace store |
+| Subscription | `85d4d146-1694-46a2-9830-43ec9f2c5ba2` |
+| Resource group | `sfg-commsos-prod` |
+| Foundry account | `commsos-foundry-hub` |
+| Project | `CommsOS-Core` |
+| Endpoint | `https://commsos-foundry-hub.services.ai.azure.com/api/projects/CommsOS-Core` |
+| Hosted agent | `ally` (Invocations 2.0.0) |
+| First-deploy model | **None.** Deterministic slice. No inference credits. |
 
-Deploy mode: **direct code / zip** (`codeConfiguration` in `azure.yaml`). Foundry builds the image. **Do not create ACR** until a Dockerfile is actually required. See [azure.yaml reference](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/azure-yaml-reference) and [What's new in Hosted Agents](https://devblogs.microsoft.com/foundry/hosted-agents-build26/).
+`azure.yaml` deploys only the Hosted agent onto that project. Do not create `rg-ally-foundry-dev`, a second Foundry account, ACR, or a Magentic graph.
+
+Deploy mode: **direct code / zip** (`codeConfiguration` in `azure.yaml`). Foundry builds the image. See [azure.yaml reference](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/azure-yaml-reference).
 
 ### Provision later
 

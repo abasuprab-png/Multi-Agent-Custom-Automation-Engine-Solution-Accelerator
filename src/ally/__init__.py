@@ -34,6 +34,8 @@ from ally.foundry import (
     SessionStore,
     handle_invoke,
 )
+from ally.foundry_project import PROJECT_ENDPOINT, PROJECT_NAME
+from ally.writer import CraftFinding, review_draft
 from ally.runtime import AllySession, assert_transition, run_vertical_slice
 
 __all__ = [
@@ -61,6 +63,10 @@ __all__ = [
     "AllyInvokeResponse",
     "SessionStore",
     "handle_invoke",
+    "PROJECT_ENDPOINT",
+    "PROJECT_NAME",
+    "review_draft",
+    "CraftFinding",
     "LockGateError",
     "MemoryStore",
     "RefusalError",

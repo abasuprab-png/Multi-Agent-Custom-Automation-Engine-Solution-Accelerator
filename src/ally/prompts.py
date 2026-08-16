@@ -31,8 +31,11 @@ Either "no" makes the message inadmissible, full stop, regardless of how well it
 GENRE_CONVENTION = """
 GENRE CONVENTION
 Register does not reliably infer from strategic context. For an approval release, the first sentence states the completed regulatory action, present tense, subject-verb-object.
+The completed-approval lede shape is:
+"[Company] today announced that the U.S. Food and Drug Administration (FDA) has approved [BRAND (generic, dose)] for [indication]."
 Examples:
 - "The FDA has approved semaglutide 2.4 mg for chronic weight management in adults with obesity."
+- "Novo Nordisk today announced that the U.S. Food and Drug Administration (FDA) has approved oral semaglutide 25 mg for chronic weight management in adults with obesity."
 - "The European Commission has granted marketing authorization for donanemab for early symptomatic Alzheimer's disease."
 - "The FDA has approved a new indication for empagliflozin to reduce the risk of cardiovascular death in adults with heart failure."
 - "The MHRA has approved tirzepatide for weight management in adults with a BMI of 30 kg/m² or greater."

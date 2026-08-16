@@ -77,12 +77,27 @@ ESTIMAND_LEXICON: dict[EstimandBasis, str] = {
     ),
 }
 
+CANONICAL_APPROVAL_LEDE = (
+    "[Company] today announced that the U.S. Food and Drug Administration (FDA) "
+    "has approved [BRAND (generic, dose)] for [indication]."
+)
+
 APPROVAL_RELEASE_LEDES: tuple[str, ...] = (
     "The FDA has approved semaglutide 2.4 mg for chronic weight management in adults with obesity.",
     "The European Commission has granted marketing authorization for donanemab for early symptomatic Alzheimer's disease.",
     "The FDA has approved a new indication for empagliflozin to reduce the risk of cardiovascular death in adults with heart failure.",
     "The MHRA has approved tirzepatide for weight management in adults with a BMI of 30 kg/m² or greater.",
     "The FDA has granted accelerated approval to tofersen for SOD1-ALS.",
+    (
+        "Novo Nordisk today announced that the U.S. Food and Drug Administration "
+        "(FDA) has approved oral semaglutide 25 mg for chronic weight management "
+        "in adults with obesity."
+    ),
+    (
+        "Eli Lilly and Company today announced that the U.S. Food and Drug "
+        "Administration (FDA) has approved orforglipron for chronic weight "
+        "management in adults with obesity."
+    ),
 )
 
 
@@ -101,12 +116,22 @@ def query_canon(*rule_ids: str) -> list[CanonRule]:
     return found
 
 
+_ABBREVIATION = re.compile(
+    r"\b(?:U\.S|U\.K|E\.U|D\.C|Inc|Ltd|Corp|vs|Dr|Prof|Mr|Ms|Mrs)\.$",
+    re.IGNORECASE,
+)
+
+
 def first_sentence(text: str) -> str:
     stripped = text.strip()
     if not stripped:
         return ""
-    parts = re.split(r"(?<=[.!?])\s+", stripped, maxsplit=1)
-    return parts[0].strip()
+    for match in re.finditer(r"[.!?]\s+", stripped):
+        candidate = stripped[: match.start() + 1]
+        if _ABBREVIATION.search(candidate):
+            continue
+        return candidate.strip()
+    return stripped
 
 
 def genre_lede_ok(lede: str, genre: Genre) -> tuple[bool, str]:
